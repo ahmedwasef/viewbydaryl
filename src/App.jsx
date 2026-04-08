@@ -533,7 +533,7 @@ function About() {
 
           <Reveal delay={0.45}>
             <div style={{ display: 'flex', gap: '2.5rem', marginBottom: '2.5rem' }}>
-              {[['52+', 'Sessions réalisées'], ['Lyon', 'Basé à'], ['∞', 'Univers créatifs']].map(([n, l]) => (
+              {[['52+', 'Sessions réalisées'], ['Montréal', 'Basé à'], ['∞', 'Univers créatifs']].map(([n, l]) => (
                 <div key={l}>
                   <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2rem', fontWeight: 600, color: '#C4965A', margin: 0 }}>{n}</p>
                   <p style={{ fontFamily: "'Inter'", fontSize: '0.7rem', fontWeight: 300, letterSpacing: '0.12em', color: '#6A6460', marginTop: '0.2rem' }}>{l}</p>
@@ -940,7 +940,7 @@ function buildCalendarUrl(form) {
     (form.message ? `Vision : ${form.message}\n\n` : '\n') +
     `Contact Daryl :\n• Email : Vbdaryl17@outlook.fr\n• WhatsApp : +1 579 372 3265\n• Instagram : @viewbydaryl__`
   )
-  const location = encodeURIComponent('Lyon, France')
+  const location = encodeURIComponent('Montréal, QC, Canada')
 
   let dates
   if (form.date) {
