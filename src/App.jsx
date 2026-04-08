@@ -125,11 +125,12 @@ function Navbar({ onNav }) {
   }, [])
 
   const links = [
-    { id: 'about',      label: 'À Propos' },
-    { id: 'portfolio',  label: 'Portfolio' },
-    { id: 'sessions',   label: 'Sessions' },
-    { id: 'booking',    label: 'Réserver' },
-    { id: 'contact',    label: 'Contact' },
+    { id: 'about',        label: 'À Propos' },
+    { id: 'portfolio',    label: 'Portfolio' },
+    { id: 'sessions',     label: 'Sessions' },
+    { id: 'temoignages',  label: 'Avis' },
+    { id: 'booking',      label: 'Réserver' },
+    { id: 'contact',      label: 'Contact' },
   ]
 
   const nav = (id) => {
@@ -1363,6 +1364,560 @@ function FloatingContact() {
   )
 }
 
+/* ═══════════════════════════════════════════════════════════
+   REVIEWS — localStorage-backed, one-per-device, photo upload
+   ═══════════════════════════════════════════════════════════ */
+
+const STORAGE_KEY  = 'vbd_reviews_v1'
+const DEVICE_KEY   = 'vbd_has_reviewed'
+
+/* Seeded starter reviews so the wall is never empty */
+const SEED_REVIEWS = [
+  {
+    id: 'seed1', name: 'Sophie L.', session: 'portrait', stars: 5,
+    text: "Daryl a su capturer exactement ce que je voulais transmettre. Les photos sont d'une qualité impressionnante, je recommande sans hésiter !",
+    date: '2025-11-14', photo: null, verified: true,
+  },
+  {
+    id: 'seed2', name: 'Marcus D.', session: 'mode', stars: 5,
+    text: "Séance mode & urbaine incroyable. Daryl connaît Lyon — pardon, Montréal — comme sa poche. Chaque décor était parfait, l'ambiance détendue et le résultat professionnel.",
+    date: '2025-12-03', photo: null, verified: true,
+  },
+  {
+    id: 'seed3', name: 'Amira K.', session: 'evenement', stars: 5,
+    text: "Il a couvert notre baby shower avec une discrétion et une sensibilité rares. Les souvenirs sont magnifiques, toute la famille est conquise.",
+    date: '2026-01-21', photo: null, verified: true,
+  },
+  {
+    id: 'seed4', name: 'Thomas R.', session: 'portrait', stars: 4,
+    text: "Très bonne expérience. Daryl met vraiment à l'aise devant l'objectif. Je referais sans hésiter.",
+    date: '2026-02-08', photo: null, verified: true,
+  },
+]
+
+const SESSION_LABELS = {
+  portrait:  'Portrait',
+  mode:      'Mode & Urbaine',
+  evenement: 'Événement',
+  corporate: 'Corporate',
+  autre:     'Autre',
+}
+
+/* ── helpers ── */
+function loadReviews() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : [...SEED_REVIEWS]
+  } catch { return [...SEED_REVIEWS] }
+}
+function saveReviews(arr) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)) } catch {}
+}
+function hasReviewed() {
+  try { return !!localStorage.getItem(DEVICE_KEY) } catch { return false }
+}
+function markReviewed() {
+  try { localStorage.setItem(DEVICE_KEY, '1') } catch {}
+}
+function avgStars(reviews) {
+  if (!reviews.length) return 0
+  return reviews.reduce((s, r) => s + r.stars, 0) / reviews.length
+}
+function starBreakdown(reviews) {
+  const counts = [0, 0, 0, 0, 0]
+  reviews.forEach(r => { if (r.stars >= 1 && r.stars <= 5) counts[r.stars - 1]++ })
+  return counts.reverse() // [5★, 4★, 3★, 2★, 1★]
+}
+
+/* ── Star display ── */
+function Stars({ value, size = 16, interactive = false, onChange }) {
+  const [hover, setHover] = useState(0)
+  const display = interactive ? (hover || value) : value
+  return (
+    <div style={{ display: 'flex', gap: '2px', cursor: interactive ? 'pointer' : 'default' }}>
+      {[1, 2, 3, 4, 5].map(n => {
+        const filled = n <= display
+        return (
+          <motion.span
+            key={n}
+            whileHover={interactive ? { scale: 1.25 } : {}}
+            whileTap={interactive ? { scale: 0.9 } : {}}
+            onMouseEnter={() => interactive && setHover(n)}
+            onMouseLeave={() => interactive && setHover(0)}
+            onClick={() => interactive && onChange && onChange(n)}
+            style={{
+              display: 'inline-block', fontSize: size, lineHeight: 1,
+              color: filled ? '#C4965A' : 'rgba(196,150,90,0.22)',
+              transition: 'color 0.15s',
+            }}
+          >
+            ★
+          </motion.span>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ── Single review card ── */
+function ReviewCard({ review, index }) {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: '-40px' })
+  const [expanded, setExpanded] = useState(false)
+  const [imgOpen, setImgOpen]   = useState(false)
+
+  const dateStr = new Date(review.date).toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  return (
+    <>
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, y: 32 }}
+        animate={inView ? { opacity: 1, y: 0 } : {}}
+        transition={{ delay: index * 0.07, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          background: '#0E0E0E',
+          border: '1px solid rgba(196,150,90,0.1)',
+          padding: 'clamp(1.4rem,3vw,2rem)',
+          position: 'relative', overflow: 'hidden',
+          display: 'flex', flexDirection: 'column', gap: '0.9rem',
+          transition: 'border-color 0.3s, transform 0.3s',
+          cursor: 'pointer',
+        }}
+        onClick={() => setExpanded(e => !e)}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(196,150,90,0.35)'; e.currentTarget.style.transform = 'translateY(-3px)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(196,150,90,0.1)';  e.currentTarget.style.transform = 'none' }}
+      >
+        {/* Top accent bar */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(to right, #C4965A ${(review.stars / 5) * 100}%, transparent ${(review.stars / 5) * 100}%)` }} />
+
+        {/* Verified badge */}
+        {review.verified && (
+          <div style={{ position: 'absolute', top: '0.9rem', right: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <span style={{ fontSize: '0.55rem', fontFamily: "'Inter'", fontWeight: 400, letterSpacing: '0.15em', color: '#C4965A', textTransform: 'uppercase' }}>✓ Vérifié</span>
+          </div>
+        )}
+
+        {/* Stars */}
+        <Stars value={review.stars} size={14} />
+
+        {/* Review text */}
+        <p style={{
+          fontFamily: "'Cormorant Garamond', serif",
+          fontStyle: 'italic', fontSize: 'clamp(0.95rem,1.5vw,1.08rem)',
+          fontWeight: 300, color: '#C8C0B0', lineHeight: 1.65, margin: 0,
+          display: '-webkit-box', WebkitLineClamp: expanded ? 'unset' : 3,
+          WebkitBoxOrient: 'vertical', overflow: expanded ? 'visible' : 'hidden',
+        }}>
+          «&thinsp;{review.text}&thinsp;»
+        </p>
+
+        {/* Photo thumbnail */}
+        {review.photo && (
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ overflow: 'hidden' }}
+              >
+                <img
+                  src={review.photo} alt="Photo client"
+                  onClick={e => { e.stopPropagation(); setImgOpen(true) }}
+                  style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', display: 'block', marginTop: '0.4rem', cursor: 'zoom-in' }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
+        {/* Footer */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '0.5rem', borderTop: '1px solid rgba(196,150,90,0.07)' }}>
+          <div>
+            <p style={{ fontFamily: "'Inter'", fontWeight: 500, fontSize: '0.8rem', color: '#E8E0D0', margin: 0 }}>{review.name}</p>
+            <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.65rem', color: '#5A5450', margin: '0.15rem 0 0', letterSpacing: '0.05em' }}>
+              {SESSION_LABELS[review.session] || review.session} · {dateStr}
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {review.photo && !expanded && (
+              <span style={{ fontSize: '0.6rem', fontFamily: "'Inter'", color: '#5A5450' }}>📷</span>
+            )}
+            <motion.span
+              animate={{ rotate: expanded ? 180 : 0 }}
+              transition={{ duration: 0.25 }}
+              style={{ fontSize: '0.7rem', color: '#C4965A', display: 'inline-block' }}
+            >
+              ▾
+            </motion.span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Full-screen photo */}
+      <AnimatePresence>
+        {imgOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setImgOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(4,4,4,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <img src={review.photo} alt="" style={{ maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain' }} />
+            <button onClick={() => setImgOpen(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: '1px solid rgba(196,150,90,0.3)', color: '#C4965A', width: '44px', height: '44px', fontSize: '1.1rem' }}>✕</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+/* ── Review submission modal ── */
+function ReviewModal({ onClose, onSubmit }) {
+  const [form, setForm] = useState({ name: '', session: '', stars: 0, text: '', photo: null })
+  const [err, setErr]   = useState({})
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [step, setStep] = useState(1) // 1 = form, 2 = success
+  const [photoLoading, setPhotoLoading] = useState(false)
+  const fileRef = useRef(null)
+
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErr(e => ({ ...e, [k]: undefined })) }
+
+  const handlePhoto = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { setErr(er => ({ ...er, photo: 'Max 5 MB' })); return }
+    setPhotoLoading(true)
+    const reader = new FileReader()
+    reader.onload = ev => {
+      // Compress via canvas
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX = 800
+        let w = img.width, h = img.height
+        if (w > h && w > MAX) { h = (h * MAX) / w; w = MAX }
+        else if (h > w && h > MAX) { w = (w * MAX) / h; h = MAX }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        const compressed = canvas.toDataURL('image/jpeg', 0.72)
+        setPhotoPreview(compressed)
+        set('photo', compressed)
+        setPhotoLoading(false)
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const validate = () => {
+    const e = {}
+    if (!form.name.trim()) e.name = 'Requis'
+    if (!form.session) e.session = 'Requis'
+    if (!form.stars) e.stars = 'Notez la séance'
+    if (!form.text.trim() || form.text.trim().length < 20) e.text = 'Minimum 20 caractères'
+    return e
+  }
+
+  const submit = (e) => {
+    e.preventDefault()
+    const v = validate()
+    if (Object.keys(v).length) { setErr(v); return }
+    onSubmit({
+      id: `r_${Date.now()}`,
+      name: form.name.trim(),
+      session: form.session,
+      stars: form.stars,
+      text: form.text.trim(),
+      date: new Date().toISOString().slice(0, 10),
+      photo: form.photo || null,
+      verified: true,
+    })
+    setStep(2)
+  }
+
+  // Lock body scroll while open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  const inp = (hasErr) => ({
+    width: '100%', padding: '0.85rem 1rem',
+    background: '#111', border: `1px solid ${hasErr ? 'rgba(220,80,80,0.5)' : 'rgba(196,150,90,0.15)'}`,
+    color: '#E8E0D0', fontFamily: "'Inter',sans-serif", fontWeight: 300, fontSize: '0.9rem',
+    outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.3s',
+    borderRadius: 0,
+  })
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(4,4,4,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 30 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 20 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        style={{ background: '#0C0C0C', border: '1px solid rgba(196,150,90,0.2)', maxWidth: '560px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding: 'clamp(1.5rem,3vw,2.2rem)', borderBottom: '1px solid rgba(196,150,90,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#0C0C0C', zIndex: 2 }}>
+          <div>
+            <p style={{ fontFamily: "'Inter'", fontWeight: 200, fontSize: '0.62rem', letterSpacing: '0.35em', textTransform: 'uppercase', color: '#C4965A', margin: 0 }}>viewbydaryl</p>
+            <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.5rem', fontWeight: 400, color: '#F5F0E8', margin: '0.2rem 0 0' }}>
+              {step === 1 ? 'Partagez votre expérience' : 'Merci pour votre avis !'}
+            </h3>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(196,150,90,0.2)', color: '#C4965A', width: '40px', height: '40px', fontSize: '1rem', flexShrink: 0 }}>✕</button>
+        </div>
+
+        <div style={{ padding: 'clamp(1.5rem,3vw,2.2rem)' }}>
+          <AnimatePresence mode="wait">
+            {step === 1 ? (
+              <motion.form key="form" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} onSubmit={submit}>
+
+                {/* Name + Session */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.9rem', marginBottom: '0.9rem' }}>
+                  <div>
+                    <label style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', color: err.name ? 'rgba(220,80,80,0.8)' : '#5A5450', display: 'block', marginBottom: '0.4rem' }}>
+                      Votre prénom {err.name && <span style={{ textTransform: 'none', letterSpacing: 0 }}>— {err.name}</span>}
+                    </label>
+                    <input placeholder="Sophie" value={form.name} onChange={e => set('name', e.target.value)} style={inp(!!err.name)} />
+                  </div>
+                  <div>
+                    <label style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', color: err.session ? 'rgba(220,80,80,0.8)' : '#5A5450', display: 'block', marginBottom: '0.4rem' }}>
+                      Type de séance {err.session && <span style={{ textTransform: 'none', letterSpacing: 0 }}>— {err.session}</span>}
+                    </label>
+                    <select value={form.session} onChange={e => set('session', e.target.value)} style={{ ...inp(!!err.session), appearance: 'none' }}>
+                      <option value="">Choisir…</option>
+                      <option value="portrait">Portrait</option>
+                      <option value="mode">Mode & Urbaine</option>
+                      <option value="evenement">Événement</option>
+                      <option value="corporate">Corporate</option>
+                      <option value="autre">Autre</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Stars */}
+                <div style={{ marginBottom: '0.9rem' }}>
+                  <label style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', color: err.stars ? 'rgba(220,80,80,0.8)' : '#5A5450', display: 'block', marginBottom: '0.6rem' }}>
+                    Note globale {err.stars && <span style={{ textTransform: 'none', letterSpacing: 0 }}>— {err.stars}</span>}
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <Stars value={form.stars} size={30} interactive onChange={v => set('stars', v)} />
+                    {form.stars > 0 && (
+                      <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                        style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.1rem', fontStyle: 'italic', color: '#C4965A' }}>
+                        {['', 'Décevant', 'Passable', 'Bien', 'Très bien', 'Excellent !'][form.stars]}
+                      </motion.span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Text */}
+                <div style={{ marginBottom: '0.9rem' }}>
+                  <label style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', color: err.text ? 'rgba(220,80,80,0.8)' : '#5A5450', display: 'block', marginBottom: '0.4rem' }}>
+                    Votre expérience {err.text && <span style={{ textTransform: 'none', letterSpacing: 0 }}>— {err.text}</span>}
+                  </label>
+                  <textarea
+                    placeholder="Décrivez votre séance, l'ambiance, le résultat… (min. 20 caractères)"
+                    value={form.text} onChange={e => set('text', e.target.value)}
+                    rows={4} style={{ ...inp(!!err.text), resize: 'vertical', minHeight: '100px' }}
+                  />
+                  <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', color: '#3A3530', marginTop: '0.3rem', textAlign: 'right' }}>{form.text.length} / 500</p>
+                </div>
+
+                {/* Photo upload */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', color: err.photo ? 'rgba(220,80,80,0.8)' : '#5A5450', display: 'block', marginBottom: '0.4rem' }}>
+                    Photo (optionnel) {err.photo && <span style={{ textTransform: 'none', letterSpacing: 0 }}>— {err.photo}</span>}
+                  </label>
+                  <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
+                  {!photoPreview ? (
+                    <button type="button" onClick={() => fileRef.current.click()}
+                      style={{ width: '100%', padding: '1.2rem', border: '1px dashed rgba(196,150,90,0.25)', background: 'transparent', color: '#5A5450', fontFamily: "'Inter'", fontSize: '0.78rem', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', transition: 'border-color 0.3s, color 0.3s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(196,150,90,0.5)'; e.currentTarget.style.color = '#C4965A' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(196,150,90,0.25)'; e.currentTarget.style.color = '#5A5450' }}
+                    >
+                      {photoLoading ? '⏳ Chargement…' : '📷 Ajouter une photo de votre séance'}
+                    </button>
+                  ) : (
+                    <div style={{ position: 'relative' }}>
+                      <img src={photoPreview} alt="preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', display: 'block' }} />
+                      <button type="button" onClick={() => { setPhotoPreview(null); set('photo', null) }}
+                        style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'rgba(8,8,8,0.85)', border: '1px solid rgba(196,150,90,0.3)', color: '#C4965A', width: '32px', height: '32px', fontSize: '0.85rem' }}>✕</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit */}
+                <button type="submit"
+                  style={{ width: '100%', padding: '0.95rem', background: '#C4965A', color: '#080808', border: 'none', fontFamily: "'Inter'", fontWeight: 500, fontSize: '0.75rem', letterSpacing: '0.22em', textTransform: 'uppercase', transition: 'background 0.3s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#D4A86A'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#C4965A'}
+                >
+                  Publier mon avis
+                </button>
+
+                <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.68rem', color: '#3A3530', textAlign: 'center', marginTop: '0.8rem', letterSpacing: '0.04em' }}>
+                  Un seul avis par appareil · votre prénom sera affiché publiquement
+                </p>
+              </motion.form>
+            ) : (
+              <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+                  style={{ width: '72px', height: '72px', border: '1px solid #C4965A', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '1.8rem', color: '#C4965A' }}>
+                  ✓
+                </motion.div>
+                <h4 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.8rem', fontWeight: 400, color: '#F5F0E8', margin: '0 0 0.8rem' }}>Avis publié !</h4>
+                <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.85rem', color: '#7A7268', lineHeight: 1.7, maxWidth: '320px', margin: '0 auto 1.8rem' }}>
+                  Merci {form.name} ! Votre témoignage est précieux et aide d'autres clients à découvrir le travail de Daryl.
+                </p>
+                <Stars value={form.stars} size={22} />
+                <button onClick={onClose}
+                  style={{ marginTop: '1.8rem', background: 'none', border: '1px solid rgba(196,150,90,0.3)', color: '#C4965A', padding: '0.8rem 2rem', fontFamily: "'Inter'", fontSize: '0.7rem', fontWeight: 300, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                  Fermer
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ── Main Reviews section ── */
+function Reviews() {
+  const [reviews, setReviews] = useState(() => loadReviews())
+  const [alreadyReviewed, setAlreadyReviewed] = useState(() => hasReviewed())
+  const [showModal, setShowModal] = useState(false)
+  const [visible, setVisible] = useState(6) // pagination
+
+  const avg   = avgStars(reviews)
+  const total = reviews.length
+  const breakdown = starBreakdown(reviews)
+
+  const handleSubmit = (review) => {
+    const updated = [review, ...reviews]
+    setReviews(updated)
+    saveReviews(updated)
+    markReviewed()
+    setAlreadyReviewed(true)
+  }
+
+  return (
+    <section id="temoignages" style={{ background: '#080808', padding: 'clamp(5rem,10vw,9rem) clamp(1.5rem,5vw,4rem)', position: 'relative', overflow: 'hidden' }}>
+      {/* Subtle BG glow */}
+      <div style={{ position: 'absolute', top: '10%', left: '-5%', width: '40vw', height: '40vw', maxWidth: '500px', maxHeight: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(196,150,90,0.03) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+
+        {/* ── Section header ── */}
+        <Reveal>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.5rem', marginBottom: 'clamp(3rem,5vw,4.5rem)' }}>
+            <div>
+              <p style={{ fontFamily: "'Inter'", fontWeight: 200, fontSize: '0.65rem', letterSpacing: '0.4em', textTransform: 'uppercase', color: '#C4965A', margin: '0 0 0.5rem' }}>06 — Témoignages</p>
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(2.5rem,5vw,4.5rem)', fontWeight: 400, color: '#F5F0E8', margin: 0 }}>
+                Ce qu'ils <span style={{ fontStyle: 'italic', color: '#C4965A' }}>disent</span>
+              </h2>
+            </div>
+            {!alreadyReviewed && (
+              <motion.button
+                whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}
+                onClick={() => setShowModal(true)}
+                style={{ background: '#C4965A', color: '#080808', border: 'none', padding: '0.9rem 2rem', fontFamily: "'Inter'", fontWeight: 500, fontSize: '0.72rem', letterSpacing: '0.22em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}
+              >
+                <span>✦</span> Laisser un avis
+              </motion.button>
+            )}
+          </div>
+        </Reveal>
+
+        {/* ── Score dashboard ── */}
+        <Reveal delay={0.1}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'clamp(2rem,4vw,4rem)', alignItems: 'center', marginBottom: 'clamp(3rem,5vw,4.5rem)', padding: 'clamp(1.5rem,3vw,2.5rem)', border: '1px solid rgba(196,150,90,0.12)', background: '#0C0C0C' }}>
+            {/* Big score */}
+            <div style={{ textAlign: 'center', minWidth: '120px' }}>
+              <p style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(3.5rem,6vw,5.5rem)', fontWeight: 700, color: '#C4965A', margin: 0, lineHeight: 1 }}>
+                {avg.toFixed(1)}
+              </p>
+              <Stars value={Math.round(avg)} size={18} />
+              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.7rem', color: '#5A5450', margin: '0.5rem 0 0', letterSpacing: '0.08em' }}>
+                {total} avis
+              </p>
+            </div>
+            {/* Breakdown bars */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {breakdown.map((count, i) => {
+                const starVal = 5 - i
+                const pct = total ? (count / total) * 100 : 0
+                return (
+                  <div key={starVal} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontFamily: "'Inter'", fontSize: '0.65rem', fontWeight: 300, color: '#5A5450', width: '16px', textAlign: 'right', flexShrink: 0 }}>{starVal}</span>
+                    <span style={{ color: '#C4965A', fontSize: '0.7rem', flexShrink: 0 }}>★</span>
+                    <div style={{ flex: 1, height: '4px', background: 'rgba(196,150,90,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        whileInView={{ width: `${pct}%` }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.8, delay: i * 0.08, ease: 'easeOut' }}
+                        style={{ height: '100%', background: '#C4965A', borderRadius: '2px' }}
+                      />
+                    </div>
+                    <span style={{ fontFamily: "'Inter'", fontSize: '0.62rem', fontWeight: 300, color: '#5A5450', width: '24px', flexShrink: 0 }}>{count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </Reveal>
+
+        {/* ── Review cards grid ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1px' }}>
+          {reviews.slice(0, visible).map((r, i) => (
+            <ReviewCard key={r.id} review={r} index={i} />
+          ))}
+        </div>
+
+        {/* ── Load more ── */}
+        {visible < reviews.length && (
+          <Reveal delay={0.1}>
+            <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+              <OutlineButton onClick={() => setVisible(v => v + 6)}>
+                Voir plus · {reviews.length - visible} avis
+              </OutlineButton>
+            </div>
+          </Reveal>
+        )}
+
+        {/* ── Already reviewed notice ── */}
+        {alreadyReviewed && (
+          <Reveal delay={0.2}>
+            <p style={{ textAlign: 'center', fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem', color: '#3A3530', marginTop: '2.5rem', letterSpacing: '0.08em' }}>
+              ✓ Vous avez déjà partagé un avis — merci pour votre confiance.
+            </p>
+          </Reveal>
+        )}
+      </div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <ReviewModal
+            onClose={() => setShowModal(false)}
+            onSubmit={(r) => { handleSubmit(r); }}
+          />
+        )}
+      </AnimatePresence>
+    </section>
+  )
+}
+
 /* ─── App ────────────────────────────────────────────────── */
 export default function App() {
   const scrollTo = (id) => {
@@ -1378,6 +1933,7 @@ export default function App() {
       <Portfolio />
       <Sessions onBook={() => scrollTo('booking')} />
       <Booking />
+      <Reviews />
       <Contact />
       <Footer />
       <FloatingContact />
