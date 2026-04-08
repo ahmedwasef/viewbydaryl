@@ -4,68 +4,74 @@ import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'fra
 const BASE = import.meta.env.BASE_URL
 
 /* ─── Photo catalogue ─────────────────────────────────────── */
+/* Categories: regards · style · cites · instants · terrains  */
 const PHOTOS = [
-  { id: 1,  file: 'p1270769-avec-accentuation-bruit.webp', cat: 'portrait',    title: 'Lumière Rouge' },
-  { id: 2,  file: 'p1090055.webp',                          cat: 'portrait',    title: 'Sous la Pluie' },
-  { id: 3,  file: 'p1320776.webp',                          cat: 'portrait',    title: 'Éclat Sombre' },
-  { id: 4,  file: 'p1350171-1.webp',                        cat: 'portrait',    title: 'Lumière Naturelle' },
-  { id: 5,  file: 'p1110401-2.webp',                        cat: 'portrait',    title: 'Cygnes au Crépuscule' },
-  { id: 6,  file: 'p1270794-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Ombre & Lumière' },
-  { id: 7,  file: 'p1270807-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Regard' },
-  { id: 8,  file: 'p1280858-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Intensité' },
-  { id: 9,  file: 'p1280881-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Contrejour' },
-  { id: 10, file: 'p1280951-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Grain d\'Argent' },
-  { id: 11, file: 'p1290159-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Profondeur' },
-  { id: 12, file: 'p1290299-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Silence' },
-  { id: 13, file: 'p1300771-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Mystère' },
-  { id: 14, file: 'p1310419-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Détail' },
-  { id: 15, file: 'p1310446-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Douceur' },
-  { id: 16, file: 'p1310609-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Âme' },
-  { id: 17, file: 'p1310766-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Contemplation' },
-  { id: 18, file: 'p1310819-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Expression' },
-  { id: 19, file: 'p1340714-avec-accentuation-bruit.webp',  cat: 'portrait',    title: 'Présence' },
-  { id: 20, file: 'p1280127.webp',                          cat: 'portrait',    title: 'Vision' },
-  { id: 21, file: 'p1280145.webp',                          cat: 'portrait',    title: 'Instant' },
-  { id: 22, file: 'p1010953.webp',                          cat: 'mode',        title: 'Sommet' },
-  { id: 23, file: 'p1150510.webp',                          cat: 'mode',        title: 'Damier' },
-  { id: 24, file: 'p1290127.webp',                          cat: 'mode',        title: 'Rouge Passion' },
-  { id: 25, file: 'p1300655.webp',                          cat: 'mode',        title: 'Béton Blanc' },
-  { id: 26, file: 'p1280230.webp',                          cat: 'mode',        title: 'Minimalisme' },
-  { id: 27, file: 'p1290352.webp',                          cat: 'mode',        title: 'Attitude' },
-  { id: 28, file: 'p1290650.webp',                          cat: 'mode',        title: 'Posture' },
-  { id: 29, file: 'p1300673.webp',                          cat: 'mode',        title: 'Ligne' },
-  { id: 30, file: 'p1300715.webp',                          cat: 'mode',        title: 'Texture' },
-  { id: 31, file: 'p1300865.webp',                          cat: 'mode',        title: 'Mouvement' },
-  { id: 32, file: 'p1300900.webp',                          cat: 'mode',        title: 'Grâce' },
-  { id: 33, file: 'p1310849.webp',                          cat: 'mode',        title: 'Équilibre' },
-  { id: 34, file: 'p1310958.webp',                          cat: 'mode',        title: 'Forme' },
-  { id: 35, file: 'p1320793.webp',                          cat: 'mode',        title: 'Caractère' },
-  { id: 36, file: 'p1320861.webp',                          cat: 'mode',        title: 'Contraste' },
-  { id: 37, file: 'p1350085.webp',                          cat: 'mode',        title: 'Couleur' },
-  { id: 38, file: 'p1350052.webp',                          cat: 'mode',        title: 'Silhouette' },
-  { id: 39, file: 'p1310803.webp',                          cat: 'mode',        title: 'Espace' },
-  { id: 40, file: 'p1280093.webp',                          cat: 'urbaine',     title: 'Nuit Électrique' },
-  { id: 41, file: 'p1310683.webp',                          cat: 'urbaine',     title: 'Lyon Fontaine' },
-  { id: 42, file: 'p1140367.webp',                          cat: 'urbaine',     title: 'Rue' },
-  { id: 43, file: 'p1150635.webp',                          cat: 'urbaine',     title: 'Architecture' },
-  { id: 44, file: 'p1160024.webp',                          cat: 'urbaine',     title: 'Lumières de Ville' },
-  { id: 45, file: 'p1240906.webp',                          cat: 'urbaine',     title: 'Passage' },
-  { id: 46, file: 'p1250885.webp',                          cat: 'urbaine',     title: 'Angle' },
-  { id: 47, file: 'p1240530.jpg',                           cat: 'urbaine',     title: 'Horizon' },
-  { id: 48, file: 'p1210815.jpg',                           cat: 'evenement',   title: 'Baby Shower' },
-  { id: 49, file: 'p1210830.jpg',                           cat: 'evenement',   title: 'Célébration' },
-  { id: 50, file: 'p1210836.jpg',                           cat: 'evenement',   title: 'Joie Partagée' },
-  { id: 51, file: 'p1230712.webp',                          cat: 'corporate',   title: 'Portrait Métier' },
-  { id: 52, file: 'p1340822.webp',                          cat: 'corporate',   title: 'Innovation' },
+  /* ── REGARDS ─────────────────────────────────────────────── */
+  { id: 1,  file: 'p1270769-avec-accentuation-bruit.webp', cat: 'regards',   title: 'Lumière Rouge',          slogan: "Quand l'ombre devient lumière." },
+  { id: 2,  file: 'p1090055.webp',                          cat: 'regards',   title: 'Sous la Pluie',          slogan: "Les âmes libres ne craignent pas la tempête." },
+  { id: 3,  file: 'p1320776.webp',                          cat: 'regards',   title: 'Éclat Sombre',           slogan: "L'obscurité révèle ce que la lumière cache." },
+  { id: 4,  file: 'p1350171-1.webp',                        cat: 'regards',   title: 'Lumière Naturelle',      slogan: "Entre deux mondes, un regard suspendu." },
+  { id: 5,  file: 'p1110401-2.webp',                        cat: 'regards',   title: 'Cygnes au Crépuscule',   slogan: "La paix n'est jamais là où on la cherche." },
+  { id: 6,  file: 'p1270794-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Ombre & Lumière',        slogan: "Le contraste est la signature des âmes fortes." },
+  { id: 7,  file: 'p1270807-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Regard',                 slogan: "Un regard vaut mille silences." },
+  { id: 8,  file: 'p1280858-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Intensité',              slogan: "Certains brûlent sans jamais se consumer." },
+  { id: 9,  file: 'p1280881-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Contrejour',             slogan: "La lumière derrière toi, l'avenir devant." },
+  { id: 10, file: 'p1280951-avec-accentuation-bruit.webp',  cat: 'regards',   title: "Grain d'Argent",         slogan: "La perfection se cache dans l'imperfection." },
+  { id: 11, file: 'p1290159-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Profondeur',             slogan: "Les yeux ne mentent jamais." },
+  { id: 12, file: 'p1290299-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Silence',                slogan: "Le silence dit tout ce que les mots oublient." },
+  { id: 13, file: 'p1300771-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Mystère',                slogan: "Tout ce qui se cache mérite d'être révélé." },
+  { id: 14, file: 'p1310419-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Détail',                 slogan: "C'est dans les détails que réside la vérité." },
+  { id: 15, file: 'p1310446-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Douceur',                slogan: "La douceur est la force des âmes profondes." },
+  { id: 16, file: 'p1310609-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Âme',                    slogan: "Chaque âme porte un univers entier." },
+  { id: 17, file: 'p1310766-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Contemplation',          slogan: "S'arrêter, c'est déjà voyager." },
+  { id: 18, file: 'p1310819-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Expression',             slogan: "Le visage est le reflet de l'intérieur." },
+  { id: 19, file: 'p1340714-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Présence',               slogan: "Être là, vraiment — c'est déjà un art." },
+  { id: 20, file: 'p1280127.webp',                          cat: 'regards',   title: 'Vision',                 slogan: "Ce que tu vois dit qui tu es." },
+  { id: 21, file: 'p1280145.webp',                          cat: 'regards',   title: 'Instant',                slogan: "L'instant parfait n'attend pas." },
+  /* ── STYLE ───────────────────────────────────────────────── */
+  { id: 22, file: 'p1010953.webp',                          cat: 'style',     title: 'Sommet',                 slogan: "Chaque hauteur a son propre silence." },
+  { id: 23, file: 'p1150510.webp',                          cat: 'style',     title: 'Damier',                 slogan: "Le style, c'est refuser de disparaître." },
+  { id: 24, file: 'p1290127.webp',                          cat: 'style',     title: 'Rouge Passion',          slogan: "La passion n'a pas de couleur neutre." },
+  { id: 25, file: 'p1300655.webp',                          cat: 'style',     title: 'Béton Blanc',            slogan: "La ville est ta plus belle toile." },
+  { id: 26, file: 'p1280230.webp',                          cat: 'style',     title: 'Minimalisme',            slogan: "Moins de bruit, plus de présence." },
+  { id: 27, file: 'p1290352.webp',                          cat: 'style',     title: 'Attitude',               slogan: "L'attitude est le vêtement qu'on ne retire jamais." },
+  { id: 28, file: 'p1290650.webp',                          cat: 'style',     title: 'Posture',                slogan: "La façon de se tenir dit tout." },
+  { id: 29, file: 'p1300673.webp',                          cat: 'style',     title: 'Ligne',                  slogan: "La droiture est aussi un style." },
+  { id: 30, file: 'p1300715.webp',                          cat: 'style',     title: 'Texture',                slogan: "Chaque tissu a sa propre histoire." },
+  { id: 31, file: 'p1300865.webp',                          cat: 'style',     title: 'Mouvement',              slogan: "La mode n'est belle qu'en mouvement." },
+  { id: 32, file: 'p1300900.webp',                          cat: 'style',     title: 'Grâce',                  slogan: "La grâce ne s'apprend pas, elle se révèle." },
+  { id: 33, file: 'p1310849.webp',                          cat: 'style',     title: 'Équilibre',              slogan: "Le vrai style naît de l'équilibre parfait." },
+  { id: 34, file: 'p1310958.webp',                          cat: 'style',     title: 'Forme',                  slogan: "La forme suit l'intention." },
+  { id: 35, file: 'p1320793.webp',                          cat: 'style',     title: 'Caractère',              slogan: "Sans caractère, pas de style." },
+  { id: 36, file: 'p1320861.webp',                          cat: 'style',     title: 'Contraste',              slogan: "Les opposés se révèlent mutuellement." },
+  { id: 37, file: 'p1350085.webp',                          cat: 'style',     title: 'Couleur',                slogan: "La couleur est la langue de l'âme." },
+  { id: 38, file: 'p1350052.webp',                          cat: 'style',     title: 'Silhouette',             slogan: "Une silhouette peut changer une pièce entière." },
+  { id: 39, file: 'p1310803.webp',                          cat: 'style',     title: 'Espace',                 slogan: "L'espace entre les choses définit leur essence." },
+  /* ── CITÉS ───────────────────────────────────────────────── */
+  { id: 40, file: 'p1280093.webp',                          cat: 'cites',     title: 'Nuit Électrique',        slogan: "La nuit appartient à ceux qui osent." },
+  { id: 41, file: 'p1310683.webp',                          cat: 'cites',     title: 'Lyon Fontaine',          slogan: "Chaque ville a ses propres légendes." },
+  { id: 42, file: 'p1140367.webp',                          cat: 'cites',     title: 'La Rue',                 slogan: "La rue est le plus grand des studios." },
+  { id: 43, file: 'p1150635.webp',                          cat: 'cites',     title: 'Architecture',           slogan: "Les murs ont leurs propres histoires." },
+  { id: 44, file: 'p1160024.webp',                          cat: 'cites',     title: 'Lumières de Ville',      slogan: "La ville ne dort jamais vraiment." },
+  { id: 45, file: 'p1240906.webp',                          cat: 'cites',     title: 'Passage',                slogan: "Tout chemin mène quelque part." },
+  { id: 46, file: 'p1250885.webp',                          cat: 'cites',     title: 'Angle',                  slogan: "Change d'angle, change de monde." },
+  { id: 47, file: 'p1240530.jpg',                           cat: 'cites',     title: 'Horizon',                slogan: "L'horizon ne disparaît jamais." },
+  /* ── INSTANTS ────────────────────────────────────────────── */
+  { id: 48, file: 'p1210815.jpg',                           cat: 'instants',  title: 'Baby Shower',            slogan: "Chaque nouvelle vie mérite une ovation." },
+  { id: 49, file: 'p1210830.jpg',                           cat: 'instants',  title: 'Célébration',            slogan: "Les joies partagées se multiplient." },
+  { id: 50, file: 'p1210836.jpg',                           cat: 'instants',  title: 'Joie Partagée',          slogan: "La fête, c'est la vie qui se souvient d'elle-même." },
+  /* ── TERRAINS ────────────────────────────────────────────── */
+  { id: 51, file: 'p1230712.webp',                          cat: 'terrains',  title: "L'Artisan",              slogan: "Les mains qui créent racontent plus que les mots." },
+  { id: 52, file: 'p1340822.webp',                          cat: 'terrains',  title: 'Étincelles',             slogan: "L'excellence se forge dans les épreuves." },
 ]
 
 const CATEGORIES = [
-  { key: 'tout',       label: 'Tout' },
-  { key: 'portrait',   label: 'Portrait' },
-  { key: 'mode',       label: 'Mode' },
-  { key: 'urbaine',    label: 'Urbaine' },
-  { key: 'evenement',  label: 'Événement' },
-  { key: 'corporate',  label: 'Corporate' },
+  { key: 'tout',      label: 'Tout' },
+  { key: 'regards',   label: 'Regards' },
+  { key: 'style',     label: 'Style' },
+  { key: 'cites',     label: 'Cités' },
+  { key: 'instants',  label: 'Instants' },
+  { key: 'terrains',  label: 'Terrains' },
 ]
 
 /* ─── Shared animation variants ──────────────────────────── */
@@ -652,13 +658,14 @@ function Portfolio() {
               {/* Hover overlay */}
               <div className="gallery-overlay" style={{
                 position: 'absolute', inset: 0, zIndex: 2,
-                background: 'linear-gradient(to top, rgba(8,8,8,0.8) 0%, transparent 60%)',
+                background: 'linear-gradient(to top, rgba(8,8,8,0.92) 0%, rgba(8,8,8,0.2) 55%, transparent 100%)',
                 opacity: 0, transition: 'opacity 0.4s',
                 display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
                 padding: '1.2rem',
               }}>
-                <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 400, color: '#F5F0E8', margin: 0 }}>{photo.title}</p>
-                <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#C4965A', margin: '0.2rem 0 0' }}>{photo.cat}</p>
+                <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C4965A', margin: '0 0 0.35rem' }}>{photo.cat}</p>
+                <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.05rem', fontWeight: 500, color: '#F5F0E8', margin: 0, lineHeight: 1.2 }}>{photo.title}</p>
+                <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '0.82rem', fontWeight: 300, fontStyle: 'italic', color: 'rgba(196,150,90,0.85)', margin: '0.3rem 0 0', lineHeight: 1.35 }}>{photo.slogan}</p>
               </div>
 
               {!loaded[photo.id] && (
@@ -742,9 +749,12 @@ function Portfolio() {
                 alt={lightbox.title}
                 style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', display: 'block' }}
               />
-              <div style={{ padding: '1rem 0.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.1rem', fontWeight: 400, color: '#E8E0D0', margin: 0 }}>{lightbox.title}</p>
-                <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C4965A', margin: 0 }}>{lightbox.cat}</p>
+              <div style={{ padding: '0.9rem 0.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem' }}>
+                <div>
+                  <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C4965A', margin: '0 0 0.25rem' }}>{lightbox.cat}</p>
+                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', fontWeight: 500, color: '#E8E0D0', margin: 0, lineHeight: 1.2 }}>{lightbox.title}</p>
+                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '0.88rem', fontWeight: 300, fontStyle: 'italic', color: 'rgba(196,150,90,0.8)', margin: '0.3rem 0 0' }}>{lightbox.slogan}</p>
+                </div>
               </div>
             </motion.div>
 
