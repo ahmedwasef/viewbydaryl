@@ -914,6 +914,45 @@ function SessionCard({ s, onBook }) {
 }
 
 /* ─── Booking ────────────────────────────────────────────── */
+/* ─── Google Calendar URL builder ───────────────────────── */
+function buildCalendarUrl(form) {
+  const sessionLabels = {
+    portrait: 'Séance Portrait',
+    mode: 'Mode & Urbaine',
+    evenement: 'Événement',
+    corporate: 'Corporate',
+    autre: 'Sur mesure',
+  }
+  const title = encodeURIComponent(`📸 Séance Photo viewbydaryl — ${sessionLabels[form.session] || form.session}`)
+  const details = encodeURIComponent(
+    `Séance photo avec DORILAS Daryl (viewbydaryl).\n\n` +
+    `Client : ${form.nom}\n` +
+    (form.message ? `Vision : ${form.message}\n\n` : '\n') +
+    `Contact Daryl :\n• Email : Vbdaryl17@outlook.fr\n• WhatsApp : +1 579 372 3265\n• Instagram : @viewbydaryl__`
+  )
+  const location = encodeURIComponent('Lyon, France')
+
+  let dates
+  if (form.date) {
+    // All-day event: YYYYMMDD — end is next day
+    const d = new Date(form.date + 'T12:00:00')
+    const next = new Date(d)
+    next.setDate(next.getDate() + 1)
+    const fmt = dt => dt.toISOString().slice(0, 10).replace(/-/g, '')
+    dates = `${fmt(d)}/${fmt(next)}`
+  } else {
+    // Default: 2-hour block starting at 10:00 UTC today
+    const now = new Date()
+    now.setUTCHours(10, 0, 0, 0)
+    const end = new Date(now)
+    end.setUTCHours(12, 0, 0, 0)
+    const fmt = dt => dt.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    dates = `${fmt(now)}/${fmt(end)}`
+  }
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`
+}
+
 function Booking() {
   const [form, setForm] = useState({ nom: '', email: '', telephone: '', session: '', date: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
@@ -1034,15 +1073,55 @@ function Booking() {
               transition={{ duration: 0.6 }}
               style={{ textAlign: 'center', padding: 'clamp(3rem, 6vw, 5rem) 2rem' }}
             >
-              <div style={{ width: '72px', height: '72px', border: '1px solid #C4965A', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem', fontSize: '1.8rem' }}>
+              {/* Check circle */}
+              <motion.div
+                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                style={{ width: '72px', height: '72px', border: '1px solid #C4965A', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem', fontSize: '1.8rem', color: '#C4965A' }}
+              >
                 ✓
-              </div>
+              </motion.div>
+
               <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: 400, color: '#F5F0E8', margin: '0 0 1rem' }}>
                 Demande envoyée !
               </h3>
-              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.9rem', color: '#7A7268', lineHeight: 1.7, maxWidth: '400px', margin: '0 auto 2rem' }}>
-                Merci {form.nom.split(' ')[0]} ! Je vous reviens très vite pour organiser notre rencontre autour d'un café.
+              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.9rem', color: '#7A7268', lineHeight: 1.7, maxWidth: '420px', margin: '0 auto 2rem' }}>
+                Merci <span style={{ color: '#C4965A' }}>{form.nom.split(' ')[0]}</span> ! Je vous reviens très vite pour organiser notre rencontre autour d'un café.
               </p>
+
+              {/* Google Calendar CTA */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+                style={{ marginBottom: '1.5rem' }}
+              >
+                <a
+                  href={buildCalendarUrl(form)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.75rem',
+                    fontFamily: "'Inter'", fontWeight: 400, fontSize: '0.78rem',
+                    letterSpacing: '0.15em', textTransform: 'uppercase',
+                    background: '#C4965A', color: '#080808',
+                    padding: '0.9rem 2rem', textDecoration: 'none',
+                    transition: 'background 0.3s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#D4A86A'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#C4965A'}
+                >
+                  {/* Google Calendar icon */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zM5 7V5h14v2H5zm2 4h10v2H7zm0 4h7v2H7z"/>
+                  </svg>
+                  Ajouter à Google Calendar
+                </a>
+              </motion.div>
+
+              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem', color: '#3A3530', marginBottom: '2rem', letterSpacing: '0.05em' }}>
+                Un rappel sera ajouté à votre agenda pour la date choisie
+              </p>
+
               <OutlineButton onClick={() => { setSubmitted(false); setForm({ nom: '', email: '', telephone: '', session: '', date: '', message: '' }) }}>
                 Nouvelle demande
               </OutlineButton>
@@ -1101,56 +1180,72 @@ function Contact() {
         </Reveal>
 
         <Reveal delay={0.15}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(1.5rem, 4vw, 4rem)', flexWrap: 'wrap', marginBottom: '3.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(1.2rem, 3.5vw, 3.5rem)', flexWrap: 'wrap', marginBottom: '3.5rem' }}>
             {[
-              { icon: '✉', label: 'Email', value: 'dorilas.daryl@gmail.com', href: 'mailto:dorilas.daryl@gmail.com' },
-              { icon: '◎', label: 'Instagram', value: '@viewbydaryl', href: 'https://instagram.com/viewbydaryl' },
-              { icon: '◈', label: 'Basé à', value: 'Lyon, France', href: null },
+              {
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>,
+                label: 'Instagram', value: '@viewbydaryl__',
+                href: 'https://www.instagram.com/viewbydaryl__?igsh=MWtucDc2ZXh3OHBlOA==',
+              },
+              {
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>,
+                label: 'LinkedIn', value: 'Daryl Dorilas',
+                href: 'https://www.linkedin.com/in/daryl-dorilas-13566223a?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
+              },
+              {
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
+                label: 'WhatsApp', value: '+1 579 372 3265',
+                href: 'https://wa.me/15793723265',
+              },
+              {
+                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+                label: 'Email', value: 'Vbdaryl17@outlook.fr',
+                href: 'mailto:Vbdaryl17@outlook.fr',
+              },
             ].map(c => (
               <div key={c.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.5rem', color: '#C4965A', marginBottom: '0.5rem' }}>{c.icon}</div>
+                <div style={{ color: '#C4965A', marginBottom: '0.6rem', display: 'flex', justifyContent: 'center' }}>{c.icon}</div>
                 <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: '#5A5450', margin: '0 0 0.4rem' }}>{c.label}</p>
-                {c.href ? (
-                  <a href={c.href} target={c.href.startsWith('http') ? '_blank' : '_self'} rel="noreferrer"
-                    style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.9rem', color: '#C4965A', textDecoration: 'none', letterSpacing: '0.03em' }}
-                    onMouseEnter={e => e.target.style.textDecoration = 'underline'}
-                    onMouseLeave={e => e.target.style.textDecoration = 'none'}
-                  >
-                    {c.value}
-                  </a>
-                ) : (
-                  <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.9rem', color: '#8A8278', margin: 0 }}>{c.value}</p>
-                )}
+                <a href={c.href} target={c.href.startsWith('http') ? '_blank' : '_self'} rel="noreferrer"
+                  style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.85rem', color: '#C4965A', textDecoration: 'none', letterSpacing: '0.02em', display: 'block', maxWidth: '180px' }}
+                  onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  {c.value}
+                </a>
               </div>
             ))}
           </div>
         </Reveal>
 
-        {/* Social follow */}
+        {/* Social buttons row */}
         <Reveal delay={0.3}>
-          <a
-            href="https://instagram.com/viewbydaryl"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.8rem',
-              fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem',
-              letterSpacing: '0.22em', textTransform: 'uppercase',
-              color: '#C4965A', textDecoration: 'none',
-              border: '1px solid rgba(196,150,90,0.3)',
-              padding: '0.9rem 2.2rem',
-              transition: 'background 0.3s, color 0.3s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(196,150,90,0.1)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-              <circle cx="12" cy="12" r="4"/>
-              <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
-            </svg>
-            Suivre sur Instagram
-          </a>
+          <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href="https://www.instagram.com/viewbydaryl__?igsh=MWtucDc2ZXh3OHBlOA==" target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C4965A', textDecoration: 'none', border: '1px solid rgba(196,150,90,0.3)', padding: '0.75rem 1.6rem', transition: 'background 0.3s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(196,150,90,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+              Instagram
+            </a>
+            <a href="https://www.linkedin.com/in/daryl-dorilas-13566223a?utm_source=share_via&utm_content=profile&utm_medium=member_ios" target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C4965A', textDecoration: 'none', border: '1px solid rgba(196,150,90,0.3)', padding: '0.75rem 1.6rem', transition: 'background 0.3s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(196,150,90,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              LinkedIn
+            </a>
+            <a href="https://wa.me/15793723265" target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C4965A', textDecoration: 'none', border: '1px solid rgba(196,150,90,0.3)', padding: '0.75rem 1.6rem', transition: 'background 0.3s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(196,150,90,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp
+            </a>
+          </div>
         </Reveal>
       </div>
     </section>
@@ -1208,8 +1303,26 @@ function FloatingContact() {
           }}
         >
           {[
-            { icon: '✉', href: 'mailto:dorilas.daryl@gmail.com', label: 'Email' },
-            { icon: '◎', href: 'https://instagram.com/viewbydaryl', label: 'Instagram' },
+            {
+              label: 'Instagram',
+              href: 'https://www.instagram.com/viewbydaryl__?igsh=MWtucDc2ZXh3OHBlOA==',
+              icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>,
+            },
+            {
+              label: 'LinkedIn',
+              href: 'https://www.linkedin.com/in/daryl-dorilas-13566223a?utm_source=share_via&utm_content=profile&utm_medium=member_ios',
+              icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>,
+            },
+            {
+              label: 'WhatsApp',
+              href: 'https://wa.me/15793723265',
+              icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
+            },
+            {
+              label: 'Email',
+              href: 'mailto:Vbdaryl17@outlook.fr',
+              icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+            },
           ].map(c => (
             <a
               key={c.label}
@@ -1224,8 +1337,7 @@ function FloatingContact() {
                 borderLeft: '1px solid rgba(196,150,90,0.3)',
                 borderTop: '1px solid rgba(196,150,90,0.1)',
                 borderBottom: '1px solid rgba(196,150,90,0.1)',
-                color: '#C4965A', fontFamily: "'Cormorant Garamond', serif",
-                fontSize: '0.9rem', textDecoration: 'none',
+                color: '#C4965A', textDecoration: 'none',
                 transition: 'background 0.3s',
                 backdropFilter: 'blur(10px)',
               }}
