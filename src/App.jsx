@@ -1,7 +1,73 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion'
+import BookingCalendar from './BookingCalendar'
+import Admin from './Admin'
 
 const BASE = import.meta.env.BASE_URL
+
+/* ─── Bookings (availability) helpers ───────────────────── */
+const BOOKINGS_KEY = 'vbd_bookings_v1'
+function loadBookings() {
+  try { return JSON.parse(localStorage.getItem(BOOKINGS_KEY) || '[]') } catch { return [] }
+}
+function saveBooking(booking) {
+  const arr = loadBookings()
+  arr.push({ ...booking, id: `bk_${Date.now()}` })
+  try { localStorage.setItem(BOOKINGS_KEY, JSON.stringify(arr)) } catch {}
+}
+function getBookedDates() {
+  return loadBookings().map(b => b.date).filter(Boolean)
+}
+
+/* ─── Admin content overrides ───────────────────────────── */
+function loadAdminContent(defaults) {
+  const out = { ...defaults }
+  try {
+    const p = localStorage.getItem('vbd_admin_photos')
+    const s = localStorage.getItem('vbd_admin_sessions')
+    const a = localStorage.getItem('vbd_admin_about')
+    if (p) out.photos   = JSON.parse(p)
+    if (s) out.sessions = JSON.parse(s)
+    if (a) out.about    = JSON.parse(a)
+  } catch {}
+  return out
+}
+
+/* ─── ICS calendar file generator ───────────────────────── */
+function generateICS(form) {
+  const SESSION_LABELS_ICS = {
+    portrait: 'Séance Portrait', mode: 'Mode & Urbaine',
+    evenement: 'Événement', corporate: 'Corporate', autre: 'Sur mesure',
+  }
+  const title   = `Séance Photo viewbydaryl — ${SESSION_LABELS_ICS[form.session] || form.session}`
+  const dtStart = form.date ? form.date.replace(/-/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const nextDay = (() => {
+    const d = new Date((form.date || new Date().toISOString().slice(0, 10)) + 'T12:00:00')
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().slice(0, 10).replace(/-/g, '')
+  })()
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//viewbydaryl//FR', 'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${Date.now()}@viewbydaryl`,
+    `DTSTART;VALUE=DATE:${dtStart}`,
+    `DTEND;VALUE=DATE:${nextDay}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:Client: ${form.nom}\\nEmail: ${form.email}\\nTél: ${form.telephone || 'n/a'}\\n\\n${form.message || ''}`,
+    'LOCATION:Montréal\\, QC\\, Canada',
+    'ORGANIZER;CN=DORILAS Daryl:mailto:Vbdaryl17@outlook.fr',
+    `ATTENDEE;ROLE=REQ-PARTICIPANT:mailto:${form.email}`,
+    'STATUS:TENTATIVE',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n')
+}
+function downloadICS(form) {
+  const blob = new Blob([generateICS(form)], { type: 'text/calendar;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), { href: url, download: 'seance-viewbydaryl.ics' })
+  document.body.appendChild(a); a.click()
+  document.body.removeChild(a); URL.revokeObjectURL(url)
+}
 
 /* ─── Photo catalogue ─────────────────────────────────────── */
 /* Categories: regards · style · cites · instants · terrains  */
@@ -387,24 +453,26 @@ function Hero({ onCta }) {
 }
 
 /* ─── Button helpers ─────────────────────────────────────── */
-function GoldButton({ children, onClick, type = 'button', fullWidth = false }) {
+function GoldButton({ children, onClick, type = 'button', fullWidth = false, disabled = false }) {
   const [hov, setHov] = useState(false)
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
         fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: '0.72rem',
         letterSpacing: '0.22em', textTransform: 'uppercase',
         padding: '0.9rem 2.2rem',
-        background: hov ? '#D4A86A' : '#C4965A',
+        background: disabled ? '#5A5050' : hov ? '#D4A86A' : '#C4965A',
         color: '#080808',
-        border: 'none', cursor: 'pointer',
+        border: 'none', cursor: disabled ? 'default' : 'pointer',
         transition: 'background 0.3s, transform 0.3s',
-        transform: hov ? 'translateY(-2px)' : 'none',
+        transform: hov && !disabled ? 'translateY(-2px)' : 'none',
         width: fullWidth ? '100%' : 'auto',
+        opacity: disabled ? 0.6 : 1,
       }}
     >
       {children}
@@ -462,7 +530,11 @@ function SectionHeader({ number, title, subtitle }) {
 }
 
 /* ─── About ───────────────────────────────────────────────── */
-function About() {
+function About({ about }) {
+  const quote = about?.quote ?? "« Si tu lis ceci, c'est que je suis certainement la personne qu'il te faut. »"
+  const para1 = about?.para1 ?? "Allo, je m'appelle DORILAS Daryl. Je suis photographe et je crois profondément que chaque être humain mérite d'être capturé sous sa plus belle lumière — celle qui révèle son essence, son histoire, sa singularité."
+  const para2 = about?.para2 ?? "Prenons le temps de nous rencontrer et de parler de ton projet autour d'un café. Ensemble, transformons tes idées en images qui durent."
+  const stats = about?.stats ?? [['52+', 'Sessions réalisées'], ['Montréal', 'Basé à'], ['∞', 'Univers créatifs']]
   return (
     <section id="about" style={{ background: '#0A0A0A', padding: 'clamp(5rem, 10vw, 9rem) clamp(1.5rem, 5vw, 4rem)' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 'clamp(3rem, 6vw, 6rem)', alignItems: 'center' }}>
@@ -507,7 +579,7 @@ function About() {
               color: '#C4965A', lineHeight: 1.5,
               margin: '0 0 1.8rem',
             }}>
-              « Si tu lis ceci, c'est que je suis certainement la personne qu'il te faut. »
+              {quote}
             </p>
           </Reveal>
 
@@ -516,9 +588,7 @@ function About() {
               fontFamily: "'Inter'", fontWeight: 300, fontSize: 'clamp(0.88rem, 1.4vw, 0.95rem)',
               lineHeight: 1.85, color: '#8A8278', marginBottom: '1.4rem',
             }}>
-              Allo, je m'appelle <span style={{ color: '#E8E0D0', fontWeight: 400 }}>DORILAS Daryl</span>.
-              Je suis photographe et je crois profondément que chaque être humain mérite d'être capturé
-              sous sa plus belle lumière — celle qui révèle son essence, son histoire, sa singularité.
+              {para1}
             </p>
           </Reveal>
 
@@ -527,14 +597,13 @@ function About() {
               fontFamily: "'Inter'", fontWeight: 300, fontSize: 'clamp(0.88rem, 1.4vw, 0.95rem)',
               lineHeight: 1.85, color: '#8A8278', marginBottom: '2.5rem',
             }}>
-              Prenons le temps de nous rencontrer et de parler de ton projet autour d'un café.
-              Ensemble, transformons tes idées en images qui durent.
+              {para2}
             </p>
           </Reveal>
 
           <Reveal delay={0.45}>
             <div style={{ display: 'flex', gap: '2.5rem', marginBottom: '2.5rem' }}>
-              {[['52+', 'Sessions réalisées'], ['Montréal', 'Basé à'], ['∞', 'Univers créatifs']].map(([n, l]) => (
+              {stats.map(([n, l]) => (
                 <div key={l}>
                   <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2rem', fontWeight: 600, color: '#C4965A', margin: 0 }}>{n}</p>
                   <p style={{ fontFamily: "'Inter'", fontSize: '0.7rem', fontWeight: 300, letterSpacing: '0.12em', color: '#6A6460', marginTop: '0.2rem' }}>{l}</p>
@@ -569,12 +638,15 @@ function SectionHeaderInline({ number, title, subtitle }) {
 }
 
 /* ─── Portfolio / Lightbox ───────────────────────────────── */
-function Portfolio() {
+function Portfolio({ photos: photosProp }) {
+  const photos = photosProp || PHOTOS
   const [activeCat, setActiveCat] = useState('tout')
   const [lightbox, setLightbox] = useState(null)
   const [loaded, setLoaded] = useState({})
+  // Touch swipe state
+  const touchStartX = useRef(null)
 
-  const filtered = activeCat === 'tout' ? PHOTOS : PHOTOS.filter(p => p.cat === activeCat)
+  const filtered = activeCat === 'tout' ? photos : photos.filter(p => p.cat === activeCat)
 
   const prev = useCallback(() => {
     if (!lightbox) return
@@ -693,88 +765,144 @@ function Portfolio() {
 
       {/* Lightbox */}
       <AnimatePresence>
-        {lightbox && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 200,
-              background: 'rgba(4,4,4,0.96)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-            onClick={() => setLightbox(null)}
-          >
-            {/* Close */}
-            <button
+        {lightbox && (() => {
+          const currentIdx = filtered.findIndex(p => p.id === lightbox.id)
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
               style={{
-                position: 'absolute', top: '1.5rem', right: '1.5rem',
-                background: 'none', border: '1px solid rgba(196,150,90,0.3)',
-                color: '#C4965A', cursor: 'pointer',
-                width: '44px', height: '44px', fontSize: '1.2rem',
+                position: 'fixed', inset: 0, zIndex: 200,
+                background: 'rgba(4,4,4,0.97)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
               onClick={() => setLightbox(null)}
+              onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
+              onTouchEnd={e => {
+                if (touchStartX.current === null) return
+                const dx = e.changedTouches[0].clientX - touchStartX.current
+                if (dx < -50) next()
+                else if (dx > 50) prev()
+                touchStartX.current = null
+              }}
             >
-              ✕
-            </button>
-
-            {/* Prev */}
-            <button
-              style={{
-                position: 'absolute', left: 'clamp(0.5rem, 2vw, 2rem)', top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: '1px solid rgba(196,150,90,0.3)',
-                color: '#C4965A', cursor: 'pointer',
-                width: '48px', height: '48px', fontSize: '1.2rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              {/* Top bar: counter + close */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '1rem 1.5rem',
+                background: 'linear-gradient(to bottom, rgba(4,4,4,0.8), transparent)',
                 zIndex: 10,
               }}
-              onClick={e => { e.stopPropagation(); prev() }}
-            >
-              ‹
-            </button>
-
-            {/* Image */}
-            <motion.div
-              key={lightbox.id}
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
-              onClick={e => e.stopPropagation()}
-              style={{ maxWidth: '90vw', maxHeight: '88vh', position: 'relative' }}
-            >
-              <img
-                src={`${BASE}photos/${lightbox.file}`}
-                alt={lightbox.title}
-                style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', display: 'block' }}
-              />
-              <div style={{ padding: '0.9rem 0.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem' }}>
-                <div>
-                  <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C4965A', margin: '0 0 0.25rem' }}>{lightbox.cat}</p>
-                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', fontWeight: 500, color: '#E8E0D0', margin: 0, lineHeight: 1.2 }}>{lightbox.title}</p>
-                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '0.88rem', fontWeight: 300, fontStyle: 'italic', color: 'rgba(196,150,90,0.8)', margin: '0.3rem 0 0' }}>{lightbox.slogan}</p>
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Category + counter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#C4965A', background: 'rgba(196,150,90,0.1)', padding: '0.25rem 0.7rem', border: '1px solid rgba(196,150,90,0.2)' }}>
+                    {lightbox.cat}
+                  </span>
+                  <span style={{ fontFamily: "'Inter'", fontSize: '0.65rem', fontWeight: 300, color: '#5A5450', letterSpacing: '0.1em' }}>
+                    {currentIdx + 1} / {filtered.length}
+                  </span>
                 </div>
+                <button
+                  style={{
+                    background: 'none', border: '1px solid rgba(196,150,90,0.3)',
+                    color: '#C4965A', cursor: 'pointer',
+                    width: '44px', height: '44px', fontSize: '1.2rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                  onClick={() => setLightbox(null)}
+                >
+                  ✕
+                </button>
               </div>
-            </motion.div>
 
-            {/* Next */}
-            <button
-              style={{
-                position: 'absolute', right: 'clamp(0.5rem, 2vw, 2rem)', top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: '1px solid rgba(196,150,90,0.3)',
-                color: '#C4965A', cursor: 'pointer',
-                width: '48px', height: '48px', fontSize: '1.2rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                zIndex: 10,
-              }}
-              onClick={e => { e.stopPropagation(); next() }}
-            >
-              ›
-            </button>
-          </motion.div>
-        )}
+              {/* Prev */}
+              <button
+                style={{
+                  position: 'absolute', left: 'clamp(0.5rem, 2vw, 2rem)', top: '50%', transform: 'translateY(-50%)',
+                  background: 'rgba(8,8,8,0.6)', backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(196,150,90,0.3)',
+                  color: '#C4965A', cursor: 'pointer',
+                  width: '48px', height: '48px', fontSize: '1.4rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  zIndex: 10,
+                }}
+                onClick={e => { e.stopPropagation(); prev() }}
+              >
+                ‹
+              </button>
+
+              {/* Image + caption */}
+              <motion.div
+                key={lightbox.id}
+                initial={{ opacity: 0, scale: 0.94 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.32 }}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  maxWidth: 'min(90vw, calc(100vh * 0.75))', width: '100%',
+                  padding: '0 3.5rem',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <img
+                  src={`${BASE}photos/${lightbox.file}`}
+                  alt={lightbox.title}
+                  style={{
+                    maxWidth: '100%', maxHeight: '75vh',
+                    objectFit: 'contain', display: 'block',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                  }}
+                />
+
+                {/* Caption panel */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15, duration: 0.4 }}
+                  style={{
+                    width: '100%', padding: '1rem 0.5rem 0',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem',
+                  }}
+                >
+                  <div>
+                    <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1rem, 2.5vw, 1.3rem)', fontWeight: 500, color: '#E8E0D0', margin: 0, lineHeight: 1.2 }}>
+                      {lightbox.title}
+                    </p>
+                    <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(0.8rem, 1.8vw, 0.92rem)', fontWeight: 300, fontStyle: 'italic', color: 'rgba(196,150,90,0.8)', margin: '0.3rem 0 0' }}>
+                      {lightbox.slogan}
+                    </p>
+                  </div>
+                  {/* Swipe hint on mobile */}
+                  <p style={{ fontFamily: "'Inter'", fontSize: '0.58rem', fontWeight: 300, color: '#3A3530', letterSpacing: '0.08em', textAlign: 'right', flexShrink: 0 }}>
+                    ← →
+                  </p>
+                </motion.div>
+              </motion.div>
+
+              {/* Next */}
+              <button
+                style={{
+                  position: 'absolute', right: 'clamp(0.5rem, 2vw, 2rem)', top: '50%', transform: 'translateY(-50%)',
+                  background: 'rgba(8,8,8,0.6)', backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(196,150,90,0.3)',
+                  color: '#C4965A', cursor: 'pointer',
+                  width: '48px', height: '48px', fontSize: '1.4rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  zIndex: 10,
+                }}
+                onClick={e => { e.stopPropagation(); next() }}
+              >
+                ›
+              </button>
+            </motion.div>
+          )
+        })()}
       </AnimatePresence>
 
       <style>{`
@@ -817,13 +945,14 @@ const SESSIONS = [
   },
 ]
 
-function Sessions({ onBook }) {
+function Sessions({ onBook, sessions: sessionsProp }) {
+  const sessions = sessionsProp || SESSIONS
   return (
     <section id="sessions" style={{ background: '#0C0C0C', padding: 'clamp(5rem, 10vw, 9rem) clamp(1.5rem, 5vw, 4rem)' }}>
       <SectionHeader number="03" title="Nos Sessions" subtitle="Tarifs & Formules" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5px', maxWidth: '1100px', margin: '0 auto' }}>
-        {SESSIONS.map((s, i) => (
+        {sessions.map((s, i) => (
           <Reveal key={s.name} delay={i * 0.15}>
             <SessionCard s={s} onBook={onBook} />
           </Reveal>
@@ -968,6 +1097,8 @@ function Booking() {
   const [form, setForm] = useState({ nom: '', email: '', telephone: '', session: '', date: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState({})
+  const [sending, setSending] = useState(false)
+  const [bookedDates, setBookedDates] = useState(() => getBookedDates())
 
   const validate = () => {
     const e = {}
@@ -977,10 +1108,32 @@ function Booking() {
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const v = validate()
     if (Object.keys(v).length) { setErrors(v); return }
+    setSending(true)
+    // Save booking locally (blocks the date)
+    saveBooking({ nom: form.nom, email: form.email, telephone: form.telephone, session: form.session, date: form.date, message: form.message })
+    setBookedDates(getBookedDates())
+    // Try Formspree if configured
+    try {
+      const settings = JSON.parse(localStorage.getItem('vbd_admin_settings') || '{}')
+      if (settings.formspreeId) {
+        await fetch(`https://formspree.io/f/${settings.formspreeId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            _subject: `📸 Nouvelle réservation viewbydaryl — ${form.session}`,
+            _replyto: form.email,
+            nom: form.nom, email: form.email, telephone: form.telephone || 'n/a',
+            session: form.session, date: form.date || 'non précisée',
+            message: form.message || '—',
+          }),
+        })
+      }
+    } catch {}
+    setSending(false)
     setSubmitted(true)
   }
 
@@ -1048,7 +1201,16 @@ function Booking() {
               <Reveal delay={0.2}>
                 <div style={{ marginBottom: '1.2rem' }}>
                   <FormField label="Date souhaitée">
-                    <input type="date" value={form.date} onChange={e => set('date', e.target.value)} style={inputStyle(false)} />
+                    <BookingCalendar
+                      selectedDate={form.date}
+                      onChange={d => set('date', d)}
+                      bookedDates={bookedDates}
+                    />
+                    {form.date && (
+                      <p style={{ fontFamily: "'Inter'", fontSize: '0.7rem', fontWeight: 300, color: '#C4965A', margin: '0.4rem 0 0', letterSpacing: '0.06em' }}>
+                        Date choisie : {new Date(form.date + 'T12:00:00').toLocaleDateString('fr-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    )}
                   </FormField>
                 </div>
               </Reveal>
@@ -1068,8 +1230,8 @@ function Booking() {
               </Reveal>
 
               <Reveal delay={0.4}>
-                <GoldButton type="submit" fullWidth>
-                  Envoyer ma demande
+                <GoldButton type="submit" fullWidth disabled={sending}>
+                  {sending ? 'Envoi en cours…' : 'Envoyer ma demande'}
                 </GoldButton>
                 <p style={{ textAlign: 'center', fontFamily: "'Inter'", fontSize: '0.72rem', fontWeight: 300, color: '#4A4440', marginTop: '1rem', letterSpacing: '0.05em' }}>
                   Je vous répondrai dans les 24h — 48h
@@ -1096,41 +1258,58 @@ function Booking() {
               <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: 400, color: '#F5F0E8', margin: '0 0 1rem' }}>
                 Demande envoyée !
               </h3>
-              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.9rem', color: '#7A7268', lineHeight: 1.7, maxWidth: '420px', margin: '0 auto 2rem' }}>
-                Merci <span style={{ color: '#C4965A' }}>{form.nom.split(' ')[0]}</span> ! Je vous reviens très vite pour organiser notre rencontre autour d'un café.
+              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.9rem', color: '#7A7268', lineHeight: 1.7, maxWidth: '420px', margin: '0 auto 1.5rem' }}>
+                Merci <span style={{ color: '#C4965A' }}>{form.nom.split(' ')[0]}</span> !{' '}
+                {form.date ? <>La date du <span style={{ color: '#C4965A' }}>{new Date(form.date + 'T12:00:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' })}</span> est réservée.</> : 'Je vous reviens très vite.'}
               </p>
 
-              {/* Google Calendar CTA */}
+              {/* Calendar actions */}
               <motion.div
                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.6 }}
-                style={{ marginBottom: '1.5rem' }}
+                transition={{ delay: 0.4, duration: 0.6 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'center', marginBottom: '1.8rem' }}
               >
+                {/* ICS download (works with Apple Calendar, Outlook, Google) */}
+                <button
+                  onClick={() => downloadICS(form)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.7rem',
+                    fontFamily: "'Inter'", fontWeight: 400, fontSize: '0.75rem',
+                    letterSpacing: '0.15em', textTransform: 'uppercase',
+                    background: '#C4965A', color: '#080808',
+                    padding: '0.9rem 2rem', border: 'none', cursor: 'pointer',
+                    transition: 'background 0.3s', width: '100%', maxWidth: '320px', justifyContent: 'center',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#D4A86A'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#C4965A'}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Télécharger l'invitation .ics
+                </button>
+
+                {/* Google Calendar fallback */}
                 <a
                   href={buildCalendarUrl(form)}
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '0.75rem',
-                    fontFamily: "'Inter'", fontWeight: 400, fontSize: '0.78rem',
-                    letterSpacing: '0.15em', textTransform: 'uppercase',
-                    background: '#C4965A', color: '#080808',
-                    padding: '0.9rem 2rem', textDecoration: 'none',
-                    transition: 'background 0.3s',
+                    display: 'inline-flex', alignItems: 'center', gap: '0.7rem',
+                    fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.68rem',
+                    letterSpacing: '0.12em', textTransform: 'uppercase',
+                    color: '#C4965A', textDecoration: 'none',
+                    border: '1px solid rgba(196,150,90,0.3)',
+                    padding: '0.7rem 1.8rem', transition: 'background 0.3s',
+                    width: '100%', maxWidth: '320px', justifyContent: 'center', boxSizing: 'border-box',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#D4A86A'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#C4965A'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(196,150,90,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  {/* Google Calendar icon */}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V9h14v10zM5 7V5h14v2H5zm2 4h10v2H7zm0 4h7v2H7z"/>
-                  </svg>
-                  Ajouter à Google Calendar
+                  Ouvrir dans Google Calendar
                 </a>
               </motion.div>
 
-              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem', color: '#3A3530', marginBottom: '2rem', letterSpacing: '0.05em' }}>
-                Un rappel sera ajouté à votre agenda pour la date choisie
+              <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.68rem', color: '#3A3530', marginBottom: '2rem', letterSpacing: '0.05em' }}>
+                Le fichier .ics est compatible Outlook, Apple Calendar et Google Calendar
               </p>
 
               <OutlineButton onClick={() => { setSubmitted(false); setForm({ nom: '', email: '', telephone: '', session: '', date: '', message: '' }) }}>
@@ -1264,7 +1443,17 @@ function Contact() {
 }
 
 /* ─── Footer ─────────────────────────────────────────────── */
-function Footer() {
+function Footer({ onAdminTrigger }) {
+  const clickCount = useRef(0)
+  const clickTimer = useRef(null)
+
+  const handleCopyrightClick = () => {
+    clickCount.current += 1
+    clearTimeout(clickTimer.current)
+    clickTimer.current = setTimeout(() => { clickCount.current = 0 }, 600)
+    if (clickCount.current >= 3) { clickCount.current = 0; onAdminTrigger() }
+  }
+
   return (
     <footer style={{
       background: '#050505',
@@ -1281,7 +1470,12 @@ function Footer() {
           <span style={{ fontWeight: 600, letterSpacing: '0.25em' }}>DARYL</span>
         </span>
       </div>
-      <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.7rem', letterSpacing: '0.1em', color: '#3A3530', margin: 0 }}>
+      {/* Triple-click to open admin */}
+      <p
+        onClick={handleCopyrightClick}
+        style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.7rem', letterSpacing: '0.1em', color: '#3A3530', margin: 0, userSelect: 'none', cursor: 'default' }}
+        title="viewbydaryl"
+      >
         © {new Date().getFullYear()} DORILAS Daryl — Tous droits réservés
       </p>
       <div style={{ display: 'flex', gap: '1.5rem' }}>
@@ -1920,6 +2114,24 @@ function Reviews() {
 
 /* ─── App ────────────────────────────────────────────────── */
 export default function App() {
+  const [adminOpen, setAdminOpen] = useState(false)
+  const [content, setContent] = useState(() =>
+    loadAdminContent({ photos: PHOTOS, sessions: SESSIONS, about: null })
+  )
+
+  // Ctrl+Shift+A keyboard shortcut to open admin
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'A') setAdminOpen(true)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  const handleContentChange = useCallback((newContent) => {
+    setContent(c => ({ ...c, ...newContent }))
+  }, [])
+
   const scrollTo = (id) => {
     const el = document.getElementById(id)
     if (el) el.scrollIntoView({ behavior: 'smooth' })
@@ -1929,14 +2141,32 @@ export default function App() {
     <>
       <Navbar onNav={scrollTo} />
       <Hero onCta={scrollTo} />
-      <About />
-      <Portfolio />
-      <Sessions onBook={() => scrollTo('booking')} />
+      <About about={content.about} />
+      <Portfolio photos={content.photos} />
+      <Sessions onBook={() => scrollTo('booking')} sessions={content.sessions} />
       <Booking />
       <Reviews />
       <Contact />
-      <Footer />
+      <Footer onAdminTrigger={() => setAdminOpen(true)} />
       <FloatingContact />
+
+      {/* Admin dashboard overlay */}
+      <AnimatePresence>
+        {adminOpen && (
+          <Admin
+            defaultPhotos={PHOTOS}
+            defaultSessions={SESSIONS}
+            defaultAbout={{
+              quote: "« Si tu lis ceci, c'est que je suis certainement la personne qu'il te faut. »",
+              para1: "Allo, je m'appelle DORILAS Daryl. Je suis photographe et je crois profondément que chaque être humain mérite d'être capturé sous sa plus belle lumière — celle qui révèle son essence, son histoire, sa singularité.",
+              para2: "Prenons le temps de nous rencontrer et de parler de ton projet autour d'un café. Ensemble, transformons tes idées en images qui durent.",
+              stats: [['52+', 'Sessions réalisées'], ['Montréal', 'Basé à'], ['∞', 'Univers créatifs']],
+            }}
+            onClose={() => setAdminOpen(false)}
+            onContentChange={handleContentChange}
+          />
+        )}
+      </AnimatePresence>
     </>
   )
 }
