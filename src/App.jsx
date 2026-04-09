@@ -742,20 +742,19 @@ function Portfolio({ photos: photosProp }) {
                 <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '0.82rem', fontWeight: 300, fontStyle: 'italic', color: 'rgba(196,150,90,0.85)', margin: '0.3rem 0 0', lineHeight: 1.35 }}>{photo.slogan}</p>
               </div>
 
-              {!loaded[photo.id] && (
-                <div style={{ aspectRatio: '2/3', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '20px', height: '20px', border: '1px solid #C4965A', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                </div>
-              )}
               <img
-                src={`${BASE}photos/${photo.file}`}
+                src={`${BASE}photos/thumbs/${photo.file}`}
                 alt={photo.title}
                 loading="lazy"
+                decoding="async"
                 onLoad={() => setLoaded(l => ({ ...l, [photo.id]: true }))}
                 style={{
                   width: '100%',
-                  display: loaded[photo.id] ? 'block' : 'none',
-                  transition: 'transform 0.5s ease',
+                  display: 'block',
+                  transition: 'transform 0.5s ease, opacity 0.4s ease',
+                  opacity: loaded[photo.id] ? 1 : 0,
+                  background: '#111',
+                  minHeight: loaded[photo.id] ? 'auto' : '180px',
                 }}
                 className="gallery-img"
               />
