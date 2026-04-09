@@ -148,13 +148,14 @@ const fadeUp = {
 const stagger = { visible: { transition: { staggerChildren: 0.12 } } }
 
 /* ─── Animated section wrapper ───────────────────────────── */
-function Reveal({ children, delay = 0, className = '' }) {
+function Reveal({ children, delay = 0, className = '', style: styleProp }) {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-80px' })
   return (
     <motion.div
       ref={ref}
       className={className}
+      style={styleProp}
       initial="hidden"
       animate={inView ? 'visible' : 'hidden'}
       variants={fadeUp}
@@ -508,11 +509,11 @@ function OutlineButton({ children, onClick, type = 'button' }) {
 /* ─── Section Header ─────────────────────────────────────── */
 function SectionHeader({ number, title, subtitle }) {
   return (
-    <Reveal style={{ textAlign: 'center', marginBottom: 'clamp(3rem, 6vw, 5rem)' }}>
+    <Reveal style={{ textAlign: 'center', marginBottom: 'clamp(3rem, 6vw, 5rem)', width: '100%' }}>
       <p style={{
         fontFamily: "'Inter'", fontWeight: 200, fontSize: '0.65rem',
         letterSpacing: '0.4em', textTransform: 'uppercase', color: '#C4965A',
-        marginBottom: '1rem',
+        marginBottom: '1rem', textAlign: 'center',
       }}>
         {number} — {subtitle}
       </p>
@@ -520,7 +521,7 @@ function SectionHeader({ number, title, subtitle }) {
         fontFamily: "'Cormorant Garamond', serif",
         fontSize: 'clamp(2.5rem, 5vw, 4.5rem)',
         fontWeight: 400, letterSpacing: '-0.01em', color: '#F5F0E8',
-        margin: 0,
+        margin: 0, textAlign: 'center',
       }}>
         {title}
       </h2>
@@ -917,6 +918,7 @@ function Portfolio({ photos: photosProp }) {
 /* ─── Sessions ───────────────────────────────────────────── */
 const SESSIONS = [
   {
+    key: 'portrait',
     icon: '◎',
     name: 'Séance Portrait',
     duration: '1h — Studio ou extérieur',
@@ -926,6 +928,7 @@ const SESSIONS = [
     highlight: false,
   },
   {
+    key: 'mode',
     icon: '◈',
     name: 'Mode & Urbaine',
     duration: '2–3h — En ville',
@@ -935,6 +938,7 @@ const SESSIONS = [
     highlight: true,
   },
   {
+    key: 'evenement',
     icon: '◇',
     name: 'Événement',
     duration: 'Demi-journée / Journée',
@@ -954,7 +958,7 @@ function Sessions({ onBook, sessions: sessionsProp }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5px', maxWidth: '1100px', margin: '0 auto' }}>
         {sessions.map((s, i) => (
           <Reveal key={s.name} delay={i * 0.15}>
-            <SessionCard s={s} onBook={onBook} />
+            <SessionCard s={s} onBook={() => onBook(s.key || s.name)} />
           </Reveal>
         ))}
       </div>
@@ -1093,12 +1097,26 @@ function buildCalendarUrl(form) {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`
 }
 
-function Booking() {
+function Booking({ selectedSession, onSessionConsumed }) {
   const [form, setForm] = useState({ nom: '', email: '', telephone: '', session: '', date: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState({})
   const [sending, setSending] = useState(false)
   const [bookedDates, setBookedDates] = useState(() => getBookedDates())
+  const calendarRef = useRef(null)
+
+  // Pre-select session type when arriving from a session card click
+  useEffect(() => {
+    if (!selectedSession) return
+    setForm(f => ({ ...f, session: selectedSession }))
+    setErrors(e => ({ ...e, session: undefined }))
+    // Small delay so the section scroll finishes, then scroll to calendar
+    const t = setTimeout(() => {
+      calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 500)
+    onSessionConsumed?.()
+    return () => clearTimeout(t)
+  }, [selectedSession]) // eslint-disable-line
 
   const validate = () => {
     const e = {}
@@ -1199,7 +1217,7 @@ function Booking() {
               </Reveal>
 
               <Reveal delay={0.2}>
-                <div style={{ marginBottom: '1.2rem' }}>
+                <div style={{ marginBottom: '1.2rem' }} ref={calendarRef}>
                   <FormField label="Date souhaitée">
                     <BookingCalendar
                       selectedDate={form.date}
@@ -2118,6 +2136,7 @@ export default function App() {
   const [content, setContent] = useState(() =>
     loadAdminContent({ photos: PHOTOS, sessions: SESSIONS, about: null })
   )
+  const [pendingSession, setPendingSession] = useState(null)
 
   // Ctrl+Shift+A keyboard shortcut to open admin
   useEffect(() => {
@@ -2137,14 +2156,22 @@ export default function App() {
     if (el) el.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const handleBookSession = (sessionKey) => {
+    setPendingSession(sessionKey)
+    scrollTo('booking')
+  }
+
   return (
     <>
       <Navbar onNav={scrollTo} />
       <Hero onCta={scrollTo} />
       <About about={content.about} />
       <Portfolio photos={content.photos} />
-      <Sessions onBook={() => scrollTo('booking')} sessions={content.sessions} />
-      <Booking />
+      <Sessions onBook={handleBookSession} sessions={content.sessions} />
+      <Booking
+        selectedSession={pendingSession}
+        onSessionConsumed={() => setPendingSession(null)}
+      />
       <Reviews />
       <Contact />
       <Footer onAdminTrigger={() => setAdminOpen(true)} />
