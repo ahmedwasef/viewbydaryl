@@ -25,11 +25,10 @@ function loadAdminContent(defaults) {
   const out = { ...defaults }
   try {
     const p = localStorage.getItem('vbd_admin_photos')
-    const s = localStorage.getItem('vbd_admin_sessions')
     const a = localStorage.getItem('vbd_admin_about')
-    if (p) out.photos   = JSON.parse(p)
-    if (s) out.sessions = JSON.parse(s)
-    if (a) out.about    = JSON.parse(a)
+    if (p) out.photos = JSON.parse(p)
+    if (a) out.about  = JSON.parse(a)
+    // Sessions are code-managed — localStorage override intentionally removed
   } catch {}
   return out
 }
