@@ -229,28 +229,20 @@ function Reveal({ children, delay = 0, className = '', style: styleProp }) {
   )
 }
 
-/* ─── Logo SVG (globe inspired by actual LOGO.png) ───────── */
+/* ─── Logo (actual LOGO.png, tinted gold with glow) ─────── */
 function Logo({ size = 32 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="viewbydaryl logo">
-      {/* Globe outer ring */}
-      <circle cx="30" cy="30" r="25" stroke="#C4965A" strokeWidth="1.5"/>
-      {/* Longitude lines */}
-      <ellipse cx="30" cy="30" rx="10" ry="25" stroke="#C4965A" strokeWidth="0.9" opacity="0.55"/>
-      <ellipse cx="30" cy="30" rx="19" ry="25" stroke="#C4965A" strokeWidth="0.7" opacity="0.3"/>
-      {/* Equator */}
-      <line x1="5" y1="30" x2="55" y2="30" stroke="#C4965A" strokeWidth="0.9" opacity="0.55"/>
-      {/* Parallels */}
-      <ellipse cx="30" cy="20" rx="22" ry="3.8" stroke="#C4965A" strokeWidth="0.7" opacity="0.3"/>
-      <ellipse cx="30" cy="40" rx="22" ry="3.8" stroke="#C4965A" strokeWidth="0.7" opacity="0.3"/>
-      {/* Viewfinder ticks outside globe */}
-      <line x1="30" y1="1"  x2="30" y2="7"  stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="30" y1="53" x2="30" y2="59" stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="1"  y1="30" x2="7"  y2="30" stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
-      <line x1="53" y1="30" x2="59" y2="30" stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
-      {/* Center crosshair dot */}
-      <circle cx="30" cy="30" r="2.5" fill="#C4965A"/>
-    </svg>
+    <img
+      src={`${BASE}logo-daryl.png`}
+      alt="viewbydaryl logo"
+      width={size}
+      height={size}
+      style={{
+        display: 'block',
+        filter: 'brightness(0) invert(1) sepia(1) saturate(4) hue-rotate(3deg) brightness(0.88) drop-shadow(0 0 10px rgba(196,150,90,0.65))',
+        transition: 'filter 0.3s ease',
+      }}
+    />
   )
 }
 
@@ -735,6 +727,7 @@ function Portfolio({ photos: photosProp }) {
   const photos = photosProp || PHOTOS
   const [activeCat, setActiveCat]     = useState('brand')
   const [activeSubcat, setActiveSubcat] = useState(null)
+  const [hoveredCat, setHoveredCat]   = useState(null)
   const [lightbox, setLightbox] = useState(null)
   const [loaded, setLoaded] = useState({})
   const touchStartX = useRef(null)
@@ -745,6 +738,11 @@ function Portfolio({ photos: photosProp }) {
     const byCat = photos.filter(p => p.cat === activeCat)
     return activeSubcat ? byCat.filter(p => p.subcat === activeSubcat) : byCat
   }, [photos, activeCat, activeSubcat])
+
+  const previewPhotos = useMemo(() => {
+    if (!hoveredCat) return []
+    return photos.filter(p => p.cat === hoveredCat).slice(0, 5)
+  }, [hoveredCat, photos])
 
   const handleCatChange = (key) => { setActiveCat(key); setActiveSubcat(null) }
 
@@ -777,26 +775,92 @@ function Portfolio({ photos: photosProp }) {
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', marginBottom: 'clamp(2.5rem, 5vw, 4rem)' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(0.5rem, 2vw, 1.5rem)', flexWrap: 'wrap' }}>
+        <div
+          style={{ position: 'relative', display: 'flex', justifyContent: 'center', gap: 'clamp(0.5rem, 2vw, 1.5rem)', flexWrap: 'wrap' }}
+          onMouseLeave={() => setHoveredCat(null)}
+        >
           {CATEGORIES.map(c => (
             <button
               key={c.key}
               onClick={() => handleCatChange(c.key)}
+              onMouseEnter={() => setHoveredCat(c.key)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem',
                 letterSpacing: '0.2em', textTransform: 'uppercase',
-                color: activeCat === c.key ? '#C4965A' : '#5A5450',
+                color: activeCat === c.key ? '#C4965A' : hoveredCat === c.key ? '#9A9088' : '#5A5450',
                 padding: '0.4rem 0',
                 borderBottom: activeCat === c.key ? '1px solid #C4965A' : '1px solid transparent',
                 transition: 'color 0.3s, border-color 0.3s',
               }}
-              onMouseEnter={e => { if (activeCat !== c.key) e.target.style.color = '#9A9088' }}
-              onMouseLeave={e => { if (activeCat !== c.key) e.target.style.color = '#5A5450' }}
             >
               {c.label}
             </button>
           ))}
+
+          {/* Hover preview strip */}
+          <AnimatePresence>
+            {hoveredCat && previewPhotos.length > 0 && (
+              <motion.div
+                key={hoveredCat}
+                initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 1.2rem)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  display: 'flex',
+                  gap: '3px',
+                  padding: '10px',
+                  background: 'rgba(10,10,10,0.96)',
+                  border: '1px solid rgba(196,150,90,0.22)',
+                  backdropFilter: 'blur(14px)',
+                  boxShadow: '0 12px 48px rgba(0,0,0,0.7)',
+                  zIndex: 50,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {previewPhotos.map((p, i) => (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity: 0, scale: 0.88 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.22, delay: i * 0.04 }}
+                    style={{ position: 'relative', flexShrink: 0 }}
+                  >
+                    <img
+                      src={`${BASE}photos/thumbs/${p.file}`}
+                      alt={p.title}
+                      style={{
+                        width: '88px',
+                        height: '116px',
+                        objectFit: 'cover',
+                        display: 'block',
+                        filter: 'brightness(0.88)',
+                      }}
+                    />
+                  </motion.div>
+                ))}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  padding: '6px 10px',
+                  background: 'linear-gradient(to top, rgba(10,10,10,0.95), transparent)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span style={{ fontFamily: "'Inter'", fontSize: '0.52rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C4965A' }}>
+                    {CATEGORIES.find(c => c.key === hoveredCat)?.label}
+                  </span>
+                  <span style={{ fontFamily: "'Inter'", fontSize: '0.5rem', color: '#5A5450', letterSpacing: '0.1em' }}>
+                    {photos.filter(p => p.cat === hoveredCat).length} photos
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         {subcats.length > 0 && (
           <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'center' }}>
