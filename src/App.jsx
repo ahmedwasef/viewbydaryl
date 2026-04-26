@@ -4,6 +4,7 @@ import BookingCalendar from './BookingCalendar'
 import Admin from './Admin'
 
 const BASE = import.meta.env.BASE_URL
+const FORMSPREE = 'https://formspree.io/f/mwvazzpq'
 
 /* ─── Bookings (availability) helpers ───────────────────── */
 const BOOKINGS_KEY = 'vbd_bookings_v1'
@@ -1298,22 +1299,19 @@ function Booking({ selectedSession, onSessionConsumed }) {
     // Save booking locally (blocks the date)
     saveBooking({ nom: form.nom, email: form.email, telephone: form.telephone, session: form.session, date: form.date, message: form.message })
     setBookedDates(getBookedDates())
-    // Try Formspree if configured
+    // Send booking via Formspree
     try {
-      const settings = JSON.parse(localStorage.getItem('vbd_admin_settings') || '{}')
-      if (settings.formspreeId) {
-        await fetch(`https://formspree.io/f/${settings.formspreeId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            _subject: `📸 Nouvelle réservation viewbydaryl — ${form.session}`,
-            _replyto: form.email,
-            nom: form.nom, email: form.email, telephone: form.telephone || 'n/a',
-            session: form.session, date: form.date || 'non précisée',
-            message: form.message || '—',
-          }),
-        })
-      }
+      await fetch(FORMSPREE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          _subject: `📸 Nouvelle réservation viewbydaryl — ${form.session}`,
+          _replyto: form.email,
+          nom: form.nom, email: form.email, telephone: form.telephone || 'n/a',
+          session: form.session, date: form.date || 'non précisée',
+          message: form.message || '—',
+        }),
+      })
     } catch {}
     setSending(false)
     setSubmitted(true)
@@ -2426,22 +2424,19 @@ function CartDrawer() {
     if (Object.keys(v).length) { setErrs(v); return }
     setSending(true)
     try {
-      const settings = JSON.parse(localStorage.getItem('vbd_admin_settings') || '{}')
-      if (settings.formspreeId) {
-        const lines = items.map(i => `${i.title} (${i.size} · ${i.frame}) × ${i.qty} — ${i.price * i.qty}$ CAD`).join('\n')
-        await fetch(`https://formspree.io/f/${settings.formspreeId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            _subject: `🛒 Nouvelle commande viewbydaryl — ${form.nom}`,
-            _replyto: form.email,
-            nom: form.nom, email: form.email, telephone: form.telephone || 'n/a',
-            adresse: `${form.rue}, ${form.ville}, ${form.province} ${form.postal}`,
-            commande: lines,
-            total: `${total}$ CAD`,
-          }),
-        })
-      }
+      const lines = items.map(i => `${i.title} (${i.size} · ${i.frame}) × ${i.qty} — ${i.price * i.qty}$ CAD`).join('\n')
+      await fetch(FORMSPREE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          _subject: `🛒 Nouvelle commande viewbydaryl — ${form.nom}`,
+          _replyto: form.email,
+          nom: form.nom, email: form.email, telephone: form.telephone || 'n/a',
+          adresse: `${form.rue}, ${form.ville}, ${form.province} ${form.postal}`,
+          commande: lines,
+          total: `${total}$ CAD`,
+        }),
+      })
     } catch {}
     setSending(false)
     setView('success')
