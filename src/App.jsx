@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion'
 import BookingCalendar from './BookingCalendar'
 import Admin from './Admin'
@@ -33,13 +33,17 @@ function loadAdminContent(defaults) {
   return out
 }
 
+/* ─── Session label map (single source of truth) ─────────── */
+const SESSION_LABELS = {
+  portrait:  'Portrait',
+  corpo:     'Événementiel Corporatif',
+  branding:  'Branding & Mode',
+  autre:     'Sur mesure',
+}
+
 /* ─── ICS calendar file generator ───────────────────────── */
 function generateICS(form) {
-  const SESSION_LABELS_ICS = {
-    portrait: 'Séance Portrait', mode: 'Mode & Urbaine',
-    evenement: 'Événement', corporate: 'Corporate', autre: 'Sur mesure',
-  }
-  const title   = `Séance Photo viewbydaryl — ${SESSION_LABELS_ICS[form.session] || form.session}`
+  const title   = `Séance Photo viewbydaryl — ${SESSION_LABELS[form.session] || form.session}`
   const dtStart = form.date ? form.date.replace(/-/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const nextDay = (() => {
     const d = new Date((form.date || new Date().toISOString().slice(0, 10)) + 'T12:00:00')
@@ -55,7 +59,7 @@ function generateICS(form) {
     `SUMMARY:${title}`,
     `DESCRIPTION:Client: ${form.nom}\\nEmail: ${form.email}\\nTél: ${form.telephone || 'n/a'}\\n\\n${form.message || ''}`,
     'LOCATION:Montréal\\, QC\\, Canada',
-    'ORGANIZER;CN=DORILAS Daryl:mailto:Vbdaryl17@outlook.fr',
+    'ORGANIZER;CN=DORILAS Daryl:mailto:vbdaryl17@viewbydaryl.com',
     `ATTENDEE;ROLE=REQ-PARTICIPANT:mailto:${form.email}`,
     'STATUS:TENTATIVE',
     'END:VEVENT', 'END:VCALENDAR',
@@ -70,74 +74,101 @@ function downloadICS(form) {
 }
 
 /* ─── Photo catalogue ─────────────────────────────────────── */
-/* Categories: regards · style · cites · instants · terrains  */
+/* Categories: brand · corpo · event · mode                    */
 const PHOTOS = [
-  /* ── REGARDS ─────────────────────────────────────────────── */
-  { id: 1,  file: 'p1270769-avec-accentuation-bruit.webp', cat: 'regards',   title: 'Lumière Rouge',          slogan: "Quand l'ombre devient lumière." },
-  { id: 2,  file: 'p1090055.webp',                          cat: 'regards',   title: 'Sous la Pluie',          slogan: "Les âmes libres ne craignent pas la tempête." },
-  { id: 3,  file: 'p1320776.webp',                          cat: 'regards',   title: 'Éclat Sombre',           slogan: "L'obscurité révèle ce que la lumière cache." },
-  { id: 4,  file: 'p1350171-1.webp',                        cat: 'regards',   title: 'Lumière Naturelle',      slogan: "Entre deux mondes, un regard suspendu." },
-  { id: 5,  file: 'p1110401-2.webp',                        cat: 'regards',   title: 'Cygnes au Crépuscule',   slogan: "La paix n'est jamais là où on la cherche." },
-  { id: 6,  file: 'p1270794-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Ombre & Lumière',        slogan: "Le contraste est la signature des âmes fortes." },
-  { id: 7,  file: 'p1270807-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Regard',                 slogan: "Un regard vaut mille silences." },
-  { id: 8,  file: 'p1280858-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Intensité',              slogan: "Certains brûlent sans jamais se consumer." },
-  { id: 9,  file: 'p1280881-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Contrejour',             slogan: "La lumière derrière toi, l'avenir devant." },
-  { id: 10, file: 'p1280951-avec-accentuation-bruit.webp',  cat: 'regards',   title: "Grain d'Argent",         slogan: "La perfection se cache dans l'imperfection." },
-  { id: 11, file: 'p1290159-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Profondeur',             slogan: "Les yeux ne mentent jamais." },
-  { id: 12, file: 'p1290299-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Silence',                slogan: "Le silence dit tout ce que les mots oublient." },
-  { id: 13, file: 'p1300771-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Mystère',                slogan: "Tout ce qui se cache mérite d'être révélé." },
-  { id: 14, file: 'p1310419-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Détail',                 slogan: "C'est dans les détails que réside la vérité." },
-  { id: 15, file: 'p1310446-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Douceur',                slogan: "La douceur est la force des âmes profondes." },
-  { id: 16, file: 'p1310609-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Âme',                    slogan: "Chaque âme porte un univers entier." },
-  { id: 17, file: 'p1310766-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Contemplation',          slogan: "S'arrêter, c'est déjà voyager." },
-  { id: 18, file: 'p1310819-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Expression',             slogan: "Le visage est le reflet de l'intérieur." },
-  { id: 19, file: 'p1340714-avec-accentuation-bruit.webp',  cat: 'regards',   title: 'Présence',               slogan: "Être là, vraiment — c'est déjà un art." },
-  { id: 20, file: 'p1280127.webp',                          cat: 'regards',   title: 'Vision',                 slogan: "Ce que tu vois dit qui tu es." },
-  { id: 21, file: 'p1280145.webp',                          cat: 'regards',   title: 'Instant',                slogan: "L'instant parfait n'attend pas." },
-  /* ── STYLE ───────────────────────────────────────────────── */
-  { id: 22, file: 'p1010953.webp',                          cat: 'style',     title: 'Sommet',                 slogan: "Chaque hauteur a son propre silence." },
-  { id: 23, file: 'p1150510.webp',                          cat: 'style',     title: 'Damier',                 slogan: "Le style, c'est refuser de disparaître." },
-  { id: 24, file: 'p1290127.webp',                          cat: 'style',     title: 'Rouge Passion',          slogan: "La passion n'a pas de couleur neutre." },
-  { id: 25, file: 'p1300655.webp',                          cat: 'style',     title: 'Béton Blanc',            slogan: "La ville est ta plus belle toile." },
-  { id: 26, file: 'p1280230.webp',                          cat: 'style',     title: 'Minimalisme',            slogan: "Moins de bruit, plus de présence." },
-  { id: 27, file: 'p1290352.webp',                          cat: 'style',     title: 'Attitude',               slogan: "L'attitude est le vêtement qu'on ne retire jamais." },
-  { id: 28, file: 'p1290650.webp',                          cat: 'style',     title: 'Posture',                slogan: "La façon de se tenir dit tout." },
-  { id: 29, file: 'p1300673.webp',                          cat: 'style',     title: 'Ligne',                  slogan: "La droiture est aussi un style." },
-  { id: 30, file: 'p1300715.webp',                          cat: 'style',     title: 'Texture',                slogan: "Chaque tissu a sa propre histoire." },
-  { id: 31, file: 'p1300865.webp',                          cat: 'style',     title: 'Mouvement',              slogan: "La mode n'est belle qu'en mouvement." },
-  { id: 32, file: 'p1300900.webp',                          cat: 'style',     title: 'Grâce',                  slogan: "La grâce ne s'apprend pas, elle se révèle." },
-  { id: 33, file: 'p1310849.webp',                          cat: 'style',     title: 'Équilibre',              slogan: "Le vrai style naît de l'équilibre parfait." },
-  { id: 34, file: 'p1310958.webp',                          cat: 'style',     title: 'Forme',                  slogan: "La forme suit l'intention." },
-  { id: 35, file: 'p1320793.webp',                          cat: 'style',     title: 'Caractère',              slogan: "Sans caractère, pas de style." },
-  { id: 36, file: 'p1320861.webp',                          cat: 'style',     title: 'Contraste',              slogan: "Les opposés se révèlent mutuellement." },
-  { id: 37, file: 'p1350085.webp',                          cat: 'style',     title: 'Couleur',                slogan: "La couleur est la langue de l'âme." },
-  { id: 38, file: 'p1350052.webp',                          cat: 'style',     title: 'Silhouette',             slogan: "Une silhouette peut changer une pièce entière." },
-  { id: 39, file: 'p1310803.webp',                          cat: 'style',     title: 'Espace',                 slogan: "L'espace entre les choses définit leur essence." },
-  /* ── CITÉS ───────────────────────────────────────────────── */
-  { id: 40, file: 'p1280093.webp',                          cat: 'cites',     title: 'Nuit Électrique',        slogan: "La nuit appartient à ceux qui osent." },
-  { id: 41, file: 'p1310683.webp',                          cat: 'cites',     title: 'Lyon Fontaine',          slogan: "Chaque ville a ses propres légendes." },
-  { id: 42, file: 'p1140367.webp',                          cat: 'cites',     title: 'La Rue',                 slogan: "La rue est le plus grand des studios." },
-  { id: 43, file: 'p1150635.webp',                          cat: 'cites',     title: 'Architecture',           slogan: "Les murs ont leurs propres histoires." },
-  { id: 44, file: 'p1160024.webp',                          cat: 'cites',     title: 'Lumières de Ville',      slogan: "La ville ne dort jamais vraiment." },
-  { id: 45, file: 'p1240906.webp',                          cat: 'cites',     title: 'Passage',                slogan: "Tout chemin mène quelque part." },
-  { id: 46, file: 'p1250885.webp',                          cat: 'cites',     title: 'Angle',                  slogan: "Change d'angle, change de monde." },
-  { id: 47, file: 'p1240530.jpg',                           cat: 'cites',     title: 'Horizon',                slogan: "L'horizon ne disparaît jamais." },
-  /* ── INSTANTS ────────────────────────────────────────────── */
-  { id: 48, file: 'p1210815.jpg',                           cat: 'instants',  title: 'Baby Shower',            slogan: "Chaque nouvelle vie mérite une ovation." },
-  { id: 49, file: 'p1210830.jpg',                           cat: 'instants',  title: 'Célébration',            slogan: "Les joies partagées se multiplient." },
-  { id: 50, file: 'p1210836.jpg',                           cat: 'instants',  title: 'Joie Partagée',          slogan: "La fête, c'est la vie qui se souvient d'elle-même." },
-  /* ── TERRAINS ────────────────────────────────────────────── */
-  { id: 51, file: 'p1230712.webp',                          cat: 'terrains',  title: "L'Artisan",              slogan: "Les mains qui créent racontent plus que les mots." },
-  { id: 52, file: 'p1340822.webp',                          cat: 'terrains',  title: 'Étincelles',             slogan: "L'excellence se forge dans les épreuves." },
+  /* ── BRAND — MIYA KONES ──────────────────────────────────── */
+  { id: 1,  file: 'p1410484.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones I',       slogan: "L'identité d'une marque commence par une image." },
+  { id: 2,  file: 'p1410542.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones II',      slogan: "Chaque détail raconte une histoire." },
+  { id: 3,  file: 'p1410568.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones III',     slogan: "La lumière révèle ce que l'ombre dissimule." },
+  { id: 4,  file: 'p1410576.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones IV',      slogan: "Une image, mille possibilités." },
+  { id: 5,  file: 'p1410579.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones V',       slogan: "Le style se vit avant de se voir." },
+  { id: 6,  file: 'p1440506.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones VI',      slogan: "Capturer l'essence, figer le mouvement." },
+  { id: 7,  file: 'p1440541.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones VII',     slogan: "La marque, c'est ce qu'on ressent avant ce qu'on voit." },
+  { id: 8,  file: 'p1440614.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones VIII',    slogan: "Authenticité et précision." },
+  { id: 9,  file: 'p1440732.jpg',  cat: 'brand', subcat: 'miya-kones',   client: 'Miya Kones',   title: 'Miya Kones IX',      slogan: "Là où l'art rencontre l'identité." },
+  /* ── BRAND — PURPLE SEVEN ────────────────────────────────── */
+  { id: 10, file: 'p1280093.webp', cat: 'brand', subcat: 'purple-seven', client: 'Purple Seven', title: 'Purple Seven I',     slogan: "La nuit appartient à ceux qui osent." },
+  { id: 11, file: 'p1280127.webp', cat: 'brand', subcat: 'purple-seven', client: 'Purple Seven', title: 'Purple Seven II',    slogan: "Vision sans limite." },
+  { id: 12, file: 'p1280145.webp', cat: 'brand', subcat: 'purple-seven', client: 'Purple Seven', title: 'Purple Seven III',   slogan: "L'image parle quand les mots se taisent." },
+  { id: 13, file: 'p1280230.webp', cat: 'brand', subcat: 'purple-seven', client: 'Purple Seven', title: 'Purple Seven IV',    slogan: "Minimalisme, impact maximal." },
+  /* ── BRAND — RICON ───────────────────────────────────────── */
+  { id: 14, file: 'p1310609-avec-accentuation-bruit.webp', cat: 'brand', subcat: 'ricon', client: 'Ricon', title: 'Ricon I',    slogan: "L'âme d'une marque passe par ses visages." },
+  { id: 15, file: 'p1310683.webp',                         cat: 'brand', subcat: 'ricon', client: 'Ricon', title: 'Ricon II',   slogan: "Chaque ville a ses propres légendes." },
+  { id: 16, file: 'p1310766-avec-accentuation-bruit.webp', cat: 'brand', subcat: 'ricon', client: 'Ricon', title: 'Ricon III',  slogan: "S'arrêter, c'est déjà voyager." },
+  { id: 17, file: 'p1310803.webp',                         cat: 'brand', subcat: 'ricon', client: 'Ricon', title: 'Ricon IV',   slogan: "L'espace entre les choses définit leur essence." },
+  { id: 18, file: 'p1310819-avec-accentuation-bruit.webp', cat: 'brand', subcat: 'ricon', client: 'Ricon', title: 'Ricon V',    slogan: "Le visage est le reflet de l'intérieur." },
+  { id: 19, file: 'p1310849.webp',                         cat: 'brand', subcat: 'ricon', client: 'Ricon', title: 'Ricon VI',   slogan: "L'équilibre parfait entre force et élégance." },
+  /* ── BRAND — TOUKAN ──────────────────────────────────────── */
+  { id: 20, file: 'p1320861.webp', cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan I',    slogan: "Les opposés se révèlent mutuellement." },
+  { id: 21, file: 'p1320900.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan II',   slogan: "Une image vaut plus que mille mots." },
+  { id: 22, file: 'p1320930.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan III',  slogan: "Le détail fait la différence." },
+  { id: 23, file: 'p1380819.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan IV',   slogan: "L'élégance est une question de vision." },
+  { id: 24, file: 'p1380823.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan V',    slogan: "Présence, caractère, authenticité." },
+  { id: 25, file: 'p1380825.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan VI',   slogan: "La marque commence par une histoire." },
+  { id: 26, file: 'p1380840.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan VII',  slogan: "Chaque angle révèle une nouvelle vérité." },
+  { id: 27, file: 'p1380855.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan VIII', slogan: "L'image construit l'identité." },
+  { id: 28, file: 'p1380857.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan IX',   slogan: "Force et raffinement." },
+  { id: 29, file: 'p1380905.jpg',  cat: 'brand', subcat: 'toukan', client: 'Toukan', title: 'Toukan X',    slogan: "L'art de se distinguer." },
+  /* ── CORPORATE ────────────────────────────────────────────── */
+  { id: 30, file: 'p1340708-avec-accentuation-bruit.jpg',  cat: 'corpo', subcat: '', client: '', title: 'Corporate I',   slogan: "Le professionnalisme se voit avant de s'entendre." },
+  { id: 31, file: 'p1340714-avec-accentuation-bruit.webp', cat: 'corpo', subcat: '', client: '', title: 'Corporate II',  slogan: "L'image d'une équipe reflète son ambition." },
+  { id: 32, file: 'p1340718-avec-accentuation-bruit.jpg',  cat: 'corpo', subcat: '', client: '', title: 'Corporate III', slogan: "Chaque visage raconte le succès d'une entreprise." },
+  /* ── ÉVÉNEMENT — GÉNÉRAL ─────────────────────────────────── */
+  { id: 33, file: 'p1210815.jpg', cat: 'event', subcat: '', client: '', title: 'Baby Shower I',   slogan: "Chaque nouvelle vie mérite une ovation." },
+  { id: 34, file: 'p1210830.jpg', cat: 'event', subcat: '', client: '', title: 'Baby Shower II',  slogan: "Les joies partagées se multiplient." },
+  { id: 35, file: 'p1210836.jpg', cat: 'event', subcat: '', client: '', title: 'Baby Shower III', slogan: "La fête, c'est la vie qui se souvient d'elle-même." },
+  { id: 36, file: 'p1430243.jpg', cat: 'event', subcat: '', client: '', title: 'Événement I',     slogan: "Les moments précieux méritent d'être immortalisés." },
+  { id: 37, file: 'p1430259.jpg', cat: 'event', subcat: '', client: '', title: 'Événement II',    slogan: "Chaque instant compte." },
+  { id: 38, file: 'p1430262.jpg', cat: 'event', subcat: '', client: '', title: 'Événement III',   slogan: "La mémoire commence par une photo." },
+  { id: 39, file: 'p1450201.jpg', cat: 'event', subcat: '', client: '', title: 'Événement IV',    slogan: "L'émotion capturée dure pour toujours." },
+  { id: 40, file: 'p1450208.jpg', cat: 'event', subcat: '', client: '', title: 'Événement V',     slogan: "Chaque regard dit plus que mille mots." },
+  { id: 41, file: 'p1450279.jpg', cat: 'event', subcat: '', client: '', title: 'Événement VI',    slogan: "La vie est une série de moments parfaits." },
+  { id: 42, file: 'dsc1744.jpg',  cat: 'event', subcat: '', client: '', title: 'Événement VII',   slogan: "Ce qui se vit ensemble se souvient ensemble." },
+  { id: 43, file: 'dsc1745.jpg',  cat: 'event', subcat: '', client: '', title: 'Événement VIII',  slogan: "L'authenticité de l'instant, préservée." },
+  /* ── ÉVÉNEMENT — SAYASPORA ───────────────────────────────── */
+  { id: 44, file: 'p1410142.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora I',   slogan: "La diaspora célèbre, l'image garde mémoire." },
+  { id: 45, file: 'p1410198.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora II',  slogan: "Ensemble, on crée l'histoire." },
+  { id: 46, file: 'p1410201.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora III', slogan: "La culture se vit, la photo la perpétue." },
+  { id: 47, file: 'p1410208.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora IV',  slogan: "Chaque visage, une histoire." },
+  { id: 48, file: 'p1410212.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora V',   slogan: "La joie collective, figée pour l'éternité." },
+  { id: 49, file: 'p1410216.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora VI',  slogan: "Racines et élégance." },
+  { id: 50, file: 'p1410282.jpg', cat: 'event', subcat: 'sayaspora', client: 'Sayaspora', title: 'Sayaspora VII', slogan: "L'art de célébrer ensemble." },
+  /* ── MODE & FASHION ──────────────────────────────────────── */
+  { id: 51, file: 'p1150510.webp',                         cat: 'mode', subcat: '', client: '', title: 'Mode I',    slogan: "Le style, c'est refuser de disparaître." },
+  { id: 52, file: 'p1150635.webp',                         cat: 'mode', subcat: '', client: '', title: 'Mode II',   slogan: "Les murs ont leurs propres histoires." },
+  { id: 53, file: 'p1160024.webp',                         cat: 'mode', subcat: '', client: '', title: 'Mode III',  slogan: "La ville ne dort jamais vraiment." },
+  { id: 54, file: 'p1250885.webp',                         cat: 'mode', subcat: '', client: '', title: 'Mode IV',   slogan: "Change d'angle, change de monde." },
+  { id: 55, file: 'p1280858-avec-accentuation-bruit.webp', cat: 'mode', subcat: '', client: '', title: 'Mode V',    slogan: "Certains brûlent sans jamais se consumer." },
+  { id: 56, file: 'p1280881-avec-accentuation-bruit.webp', cat: 'mode', subcat: '', client: '', title: 'Mode VI',   slogan: "La lumière derrière toi, l'avenir devant." },
+  { id: 57, file: 'p1280951-avec-accentuation-bruit.webp', cat: 'mode', subcat: '', client: '', title: 'Mode VII',  slogan: "La perfection se cache dans l'imperfection." },
+  { id: 58, file: 'p1290159-avec-accentuation-bruit.webp', cat: 'mode', subcat: '', client: '', title: 'Mode VIII', slogan: "Les yeux ne mentent jamais." },
+  { id: 59, file: 'p1290299-avec-accentuation-bruit.webp', cat: 'mode', subcat: '', client: '', title: 'Mode IX',   slogan: "Le silence dit tout ce que les mots oublient." },
+  { id: 60, file: 'p1290352.webp',                         cat: 'mode', subcat: '', client: '', title: 'Mode X',    slogan: "L'attitude est le vêtement qu'on ne retire jamais." },
+  { id: 61, file: 'p1290650.webp',                         cat: 'mode', subcat: '', client: '', title: 'Mode XI',   slogan: "La façon de se tenir dit tout." },
+  { id: 62, file: 'p1440908.jpg',                          cat: 'mode', subcat: '', client: '', title: 'Mode XII',  slogan: "La mode naît de l'audace." },
+  { id: 63, file: 'p1440911.jpg',                          cat: 'mode', subcat: '', client: '', title: 'Mode XIII', slogan: "Chaque tissu a sa propre histoire." },
+  { id: 64, file: 'p1440987.jpg',                          cat: 'mode', subcat: '', client: '', title: 'Mode XIV',  slogan: "La mode n'est belle qu'en mouvement." },
+  { id: 65, file: 'p1440993.jpg',                          cat: 'mode', subcat: '', client: '', title: 'Mode XV',   slogan: "L'élégance est une forme de politesse." },
 ]
 
+const SUBCATEGORIES = {
+  brand: [
+    { key: 'miya-kones',   label: 'Miya Kones' },
+    { key: 'purple-seven', label: 'Purple Seven' },
+    { key: 'ricon',        label: 'Ricon' },
+    { key: 'toukan',       label: 'Toukan' },
+  ],
+  event: [
+    { key: 'sayaspora', label: 'Sayaspora' },
+  ],
+}
+
 const CATEGORIES = [
-  { key: 'tout',      label: 'Tout' },
-  { key: 'regards',   label: 'Regards' },
-  { key: 'style',     label: 'Style' },
-  { key: 'cites',     label: 'Cités' },
-  { key: 'instants',  label: 'Instants' },
-  { key: 'terrains',  label: 'Terrains' },
+  { key: 'tout',  label: 'Tout' },
+  { key: 'brand', label: 'Brand' },
+  { key: 'corpo', label: 'Corporate' },
+  { key: 'event', label: 'Événement' },
+  { key: 'mode',  label: 'Mode & Fashion' },
 ]
 
 /* ─── Shared animation variants ──────────────────────────── */
@@ -166,16 +197,27 @@ function Reveal({ children, delay = 0, className = '', style: styleProp }) {
   )
 }
 
-/* ─── Logo SVG ────────────────────────────────────────────── */
+/* ─── Logo SVG (globe inspired by actual LOGO.png) ───────── */
 function Logo({ size = 32 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="viewbydaryl logo">
-      <circle cx="30" cy="30" r="26" stroke="#C4965A" strokeWidth="2"/>
-      <circle cx="30" cy="30" r="10" fill="#C4965A"/>
-      <line x1="30" y1="4"  x2="30" y2="15" stroke="#C4965A" strokeWidth="2" strokeLinecap="round"/>
-      <line x1="30" y1="45" x2="30" y2="56" stroke="#C4965A" strokeWidth="2" strokeLinecap="round"/>
-      <line x1="4"  y1="30" x2="15" y2="30" stroke="#C4965A" strokeWidth="2" strokeLinecap="round"/>
-      <line x1="45" y1="30" x2="56" y2="30" stroke="#C4965A" strokeWidth="2" strokeLinecap="round"/>
+      {/* Globe outer ring */}
+      <circle cx="30" cy="30" r="25" stroke="#C4965A" strokeWidth="1.5"/>
+      {/* Longitude lines */}
+      <ellipse cx="30" cy="30" rx="10" ry="25" stroke="#C4965A" strokeWidth="0.9" opacity="0.55"/>
+      <ellipse cx="30" cy="30" rx="19" ry="25" stroke="#C4965A" strokeWidth="0.7" opacity="0.3"/>
+      {/* Equator */}
+      <line x1="5" y1="30" x2="55" y2="30" stroke="#C4965A" strokeWidth="0.9" opacity="0.55"/>
+      {/* Parallels */}
+      <ellipse cx="30" cy="20" rx="22" ry="3.8" stroke="#C4965A" strokeWidth="0.7" opacity="0.3"/>
+      <ellipse cx="30" cy="40" rx="22" ry="3.8" stroke="#C4965A" strokeWidth="0.7" opacity="0.3"/>
+      {/* Viewfinder ticks outside globe */}
+      <line x1="30" y1="1"  x2="30" y2="7"  stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="30" y1="53" x2="30" y2="59" stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="1"  y1="30" x2="7"  y2="30" stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="53" y1="30" x2="59" y2="30" stroke="#C4965A" strokeWidth="1.8" strokeLinecap="round"/>
+      {/* Center crosshair dot */}
+      <circle cx="30" cy="30" r="2.5" fill="#C4965A"/>
     </svg>
   )
 }
@@ -641,13 +683,21 @@ function SectionHeaderInline({ number, title, subtitle }) {
 /* ─── Portfolio / Lightbox ───────────────────────────────── */
 function Portfolio({ photos: photosProp }) {
   const photos = photosProp || PHOTOS
-  const [activeCat, setActiveCat] = useState('tout')
+  const [activeCat, setActiveCat]     = useState('tout')
+  const [activeSubcat, setActiveSubcat] = useState(null)
   const [lightbox, setLightbox] = useState(null)
   const [loaded, setLoaded] = useState({})
-  // Touch swipe state
   const touchStartX = useRef(null)
 
-  const filtered = activeCat === 'tout' ? photos : photos.filter(p => p.cat === activeCat)
+  const subcats = activeCat !== 'tout' ? (SUBCATEGORIES[activeCat] || []) : []
+
+  const filtered = useMemo(() => {
+    if (activeCat === 'tout') return photos
+    const byCat = photos.filter(p => p.cat === activeCat)
+    return activeSubcat ? byCat.filter(p => p.subcat === activeSubcat) : byCat
+  }, [photos, activeCat, activeSubcat])
+
+  const handleCatChange = (key) => { setActiveCat(key); setActiveSubcat(null) }
 
   const prev = useCallback(() => {
     if (!lightbox) return
@@ -677,26 +727,61 @@ function Portfolio({ photos: photosProp }) {
       <SectionHeader number="02" title="Portfolio" subtitle="Mes Travaux" />
 
       {/* Filter tabs */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(0.5rem, 2vw, 1.5rem)', marginBottom: 'clamp(2.5rem, 5vw, 4rem)', flexWrap: 'wrap' }}>
-        {CATEGORIES.map(c => (
-          <button
-            key={c.key}
-            onClick={() => setActiveCat(c.key)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem',
-              letterSpacing: '0.2em', textTransform: 'uppercase',
-              color: activeCat === c.key ? '#C4965A' : '#5A5450',
-              padding: '0.4rem 0',
-              borderBottom: activeCat === c.key ? '1px solid #C4965A' : '1px solid transparent',
-              transition: 'color 0.3s, border-color 0.3s',
-            }}
-            onMouseEnter={e => { if (activeCat !== c.key) e.target.style.color = '#9A9088' }}
-            onMouseLeave={e => { if (activeCat !== c.key) e.target.style.color = '#5A5450' }}
-          >
-            {c.label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', marginBottom: 'clamp(2.5rem, 5vw, 4rem)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(0.5rem, 2vw, 1.5rem)', flexWrap: 'wrap' }}>
+          {CATEGORIES.map(c => (
+            <button
+              key={c.key}
+              onClick={() => handleCatChange(c.key)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem',
+                letterSpacing: '0.2em', textTransform: 'uppercase',
+                color: activeCat === c.key ? '#C4965A' : '#5A5450',
+                padding: '0.4rem 0',
+                borderBottom: activeCat === c.key ? '1px solid #C4965A' : '1px solid transparent',
+                transition: 'color 0.3s, border-color 0.3s',
+              }}
+              onMouseEnter={e => { if (activeCat !== c.key) e.target.style.color = '#9A9088' }}
+              onMouseLeave={e => { if (activeCat !== c.key) e.target.style.color = '#5A5450' }}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        {subcats.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={() => setActiveSubcat(null)}
+              style={{
+                background: activeSubcat === null ? 'rgba(196,150,90,0.12)' : 'none',
+                border: '1px solid rgba(196,150,90,0.3)', cursor: 'pointer',
+                fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.6rem',
+                letterSpacing: '0.18em', textTransform: 'uppercase',
+                color: activeSubcat === null ? '#C4965A' : '#5A5450',
+                padding: '0.3rem 0.9rem', transition: 'all 0.2s',
+              }}
+            >
+              Tout
+            </button>
+            {subcats.map(s => (
+              <button
+                key={s.key}
+                onClick={() => setActiveSubcat(s.key)}
+                style={{
+                  background: activeSubcat === s.key ? 'rgba(196,150,90,0.12)' : 'none',
+                  border: '1px solid rgba(196,150,90,0.3)', cursor: 'pointer',
+                  fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.6rem',
+                  letterSpacing: '0.18em', textTransform: 'uppercase',
+                  color: activeSubcat === s.key ? '#C4965A' : '#5A5450',
+                  padding: '0.3rem 0.9rem', transition: 'all 0.2s',
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Masonry grid */}
@@ -737,7 +822,7 @@ function Portfolio({ photos: photosProp }) {
                 display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
                 padding: '1.2rem',
               }}>
-                <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C4965A', margin: '0 0 0.35rem' }}>{photo.cat}</p>
+                <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#C4965A', margin: '0 0 0.35rem' }}>{photo.client || photo.cat}</p>
                 <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.05rem', fontWeight: 500, color: '#F5F0E8', margin: 0, lineHeight: 1.2 }}>{photo.title}</p>
                 <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '0.82rem', fontWeight: 300, fontStyle: 'italic', color: 'rgba(196,150,90,0.85)', margin: '0.3rem 0 0', lineHeight: 1.35 }}>{photo.slogan}</p>
               </div>
@@ -919,31 +1004,37 @@ const SESSIONS = [
   {
     key: 'portrait',
     icon: '◎',
-    name: 'Séance Portrait',
-    duration: '1h — Studio ou extérieur',
-    price: 'Sur devis',
-    desc: 'Une séance intime dédiée à vous. Je capture votre personnalité, votre regard, votre authenticité. Idéal pour un portrait professionnel ou un shooting personnel.',
-    includes: ['10 photos retouchées', 'Galerie privée en ligne', 'Fichiers haute résolution', 'Retouche professionnelle'],
+    name: 'Portrait',
+    duration: 'Studio ou extérieur',
+    price: '250 $',
+    priceNote: 'CAD · taxes incluses',
+    studioNote: '+150 $ pour studio',
+    desc: 'Une séance intime et personnalisée pour capturer votre authenticité. Idéal pour un portrait professionnel ou un shooting personnel, en extérieur ou en studio.',
+    includes: ['5 photos retouchées', 'Galerie privée en ligne', 'Fichiers haute résolution', 'Retouche professionnelle', 'Livraison en 48h'],
     highlight: false,
   },
   {
-    key: 'mode',
+    key: 'corpo',
     icon: '◈',
-    name: 'Mode & Urbaine',
-    duration: '2–3h — En ville',
-    price: 'Sur devis',
-    desc: 'La ville devient votre décor. Architectures, lumières urbaines, atmosphères… Chaque coin de rue devient une scène pour votre histoire de mode.',
-    includes: ['20 photos retouchées', 'Repérage des lieux inclus', 'Galerie privée en ligne', 'Fichiers haute résolution', 'Direction artistique'],
+    name: 'Événementiel Corporatif',
+    duration: '4h de présence sur site',
+    price: '1 200 $',
+    priceNote: 'CAD · taxes incluses',
+    studioNote: null,
+    desc: "Couverture complète de votre événement d'entreprise avec discrétion et professionnalisme. Idéal pour conférences, soirées corporatives et lancements.",
+    includes: ['4h de prise de vues', '100+ photos retouchées', 'Galerie privée en ligne', 'Fichiers haute résolution', 'Livraison en 72h'],
     highlight: true,
   },
   {
-    key: 'evenement',
+    key: 'branding',
     icon: '◇',
-    name: 'Événement',
-    duration: 'Demi-journée / Journée',
+    name: 'Branding & Mode',
+    duration: 'Sur mesure',
     price: 'Sur devis',
-    desc: "Baby shower, anniversaire, mariage, événement d'entreprise… Je couvre votre moment précieux avec discrétion et sensibilité pour immortaliser chaque instant.",
-    includes: ['Couverture complète', 'Galerie privée en ligne', 'Fichiers haute résolution', 'Retouche professionnelle', 'Livraison sous 7 jours'],
+    priceNote: '',
+    studioNote: null,
+    desc: "Campagnes de branding, lookbooks mode et projets fashion entièrement personnalisés. Chaque projet est unique — discutons ensemble de votre vision.",
+    includes: ['Branding', 'Mode & Fashion', 'Direction artistique', 'Galerie privée en ligne', 'Fichiers haute résolution'],
     highlight: false,
   },
 ]
@@ -1029,8 +1120,13 @@ function SessionCard({ s, onBook }) {
         ))}
       </ul>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(196,150,90,0.12)', paddingTop: '1.5rem' }}>
-        <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem', fontWeight: 600, color: '#C4965A' }}>{s.price}</span>
+      <div style={{ borderTop: '1px solid rgba(196,150,90,0.12)', paddingTop: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem' }}>
+          <div>
+            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.4rem', fontWeight: 600, color: '#C4965A' }}>{s.price}</span>
+            {s.priceNote && <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, color: '#5A5450', letterSpacing: '0.08em', margin: '0.15rem 0 0' }}>{s.priceNote}</p>}
+            {s.studioNote && <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, color: 'rgba(196,150,90,0.6)', letterSpacing: '0.06em', margin: '0.1rem 0 0' }}>{s.studioNote}</p>}
+          </div>
         <button
           onClick={onBook}
           style={{
@@ -1051,6 +1147,7 @@ function SessionCard({ s, onBook }) {
         >
           Réserver
         </button>
+        </div>
       </div>
     </div>
   )
@@ -1059,19 +1156,12 @@ function SessionCard({ s, onBook }) {
 /* ─── Booking ────────────────────────────────────────────── */
 /* ─── Google Calendar URL builder ───────────────────────── */
 function buildCalendarUrl(form) {
-  const sessionLabels = {
-    portrait: 'Séance Portrait',
-    mode: 'Mode & Urbaine',
-    evenement: 'Événement',
-    corporate: 'Corporate',
-    autre: 'Sur mesure',
-  }
-  const title = encodeURIComponent(`📸 Séance Photo viewbydaryl — ${sessionLabels[form.session] || form.session}`)
+  const title = encodeURIComponent(`📸 Séance Photo viewbydaryl — ${SESSION_LABELS[form.session] || form.session}`)
   const details = encodeURIComponent(
     `Séance photo avec DORILAS Daryl (viewbydaryl).\n\n` +
     `Client : ${form.nom}\n` +
     (form.message ? `Vision : ${form.message}\n\n` : '\n') +
-    `Contact Daryl :\n• Email : Vbdaryl17@outlook.fr\n• WhatsApp : +1 579 372 3265\n• Instagram : @viewbydaryl__`
+    `Contact Daryl :\n• Email : vbdaryl17@viewbydaryl.com\n• WhatsApp : +1 579 372 3265\n• Instagram : @viewbydaryl__`
   )
   const location = encodeURIComponent('Montréal, QC, Canada')
 
@@ -1205,11 +1295,9 @@ function Booking({ selectedSession, onSessionConsumed }) {
                   <FormField label="Type de séance *" error={errors.session}>
                     <select value={form.session} onChange={e => set('session', e.target.value)} style={{ ...inputStyle(!!errors.session), appearance: 'none', cursor: 'pointer' }}>
                       <option value="">Choisir une formule</option>
-                      <option value="portrait">Séance Portrait</option>
-                      <option value="mode">Mode & Urbaine</option>
-                      <option value="evenement">Événement</option>
-                      <option value="corporate">Corporate</option>
-                      <option value="autre">Autre / Sur mesure</option>
+                      {Object.entries(SESSION_LABELS).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
                     </select>
                   </FormField>
                 </div>
@@ -1406,8 +1494,8 @@ function Contact() {
               },
               {
                 icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
-                label: 'Email', value: 'Vbdaryl17@outlook.fr',
-                href: 'mailto:Vbdaryl17@outlook.fr',
+                label: 'Email', value: 'vbdaryl17@viewbydaryl.com',
+                href: 'mailto:vbdaryl17@viewbydaryl.com',
               },
             ].map(c => (
               <div key={c.label} style={{ textAlign: 'center' }}>
@@ -1496,7 +1584,7 @@ function Footer({ onAdminTrigger }) {
         © {new Date().getFullYear()} DORILAS Daryl — Tous droits réservés
       </p>
       <div style={{ display: 'flex', gap: '1.5rem' }}>
-        {['Portrait', 'Mode', 'Événement'].map(t => (
+        {['Brand', 'Corporate', 'Événement', 'Mode'].map(t => (
           <span key={t} style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.65rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#3A3530' }}>{t}</span>
         ))}
       </div>
@@ -1542,7 +1630,7 @@ function FloatingContact() {
             },
             {
               label: 'Email',
-              href: 'mailto:Vbdaryl17@outlook.fr',
+              href: 'mailto:vbdaryl17@viewbydaryl.com',
               icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
             },
           ].map(c => (
@@ -1606,13 +1694,7 @@ const SEED_REVIEWS = [
   },
 ]
 
-const SESSION_LABELS = {
-  portrait:  'Portrait',
-  mode:      'Mode & Urbaine',
-  evenement: 'Événement',
-  corporate: 'Corporate',
-  autre:     'Autre',
-}
+/* SESSION_LABELS defined at module top */
 
 /* ── helpers ── */
 function loadReviews() {
