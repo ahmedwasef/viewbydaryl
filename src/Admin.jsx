@@ -7,7 +7,7 @@
  * Publish: PUT to GitHub API → triggers GitHub Actions rebuild
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 /* ─── Storage keys ────────────────────────────────────────── */
