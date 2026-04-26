@@ -197,7 +197,6 @@ const SUBCATEGORIES = {
 }
 
 const CATEGORIES = [
-  { key: 'tout',  label: 'Tout' },
   { key: 'brand', label: 'Brand' },
   { key: 'corpo', label: 'Corporate' },
   { key: 'event', label: 'Événement' },
@@ -734,16 +733,15 @@ function SectionHeaderInline({ number, title, subtitle }) {
 /* ─── Portfolio / Lightbox ───────────────────────────────── */
 function Portfolio({ photos: photosProp }) {
   const photos = photosProp || PHOTOS
-  const [activeCat, setActiveCat]     = useState('tout')
+  const [activeCat, setActiveCat]     = useState('brand')
   const [activeSubcat, setActiveSubcat] = useState(null)
   const [lightbox, setLightbox] = useState(null)
   const [loaded, setLoaded] = useState({})
   const touchStartX = useRef(null)
 
-  const subcats = activeCat !== 'tout' ? (SUBCATEGORIES[activeCat] || []) : []
+  const subcats = SUBCATEGORIES[activeCat] || []
 
   const filtered = useMemo(() => {
-    if (activeCat === 'tout') return photos
     const byCat = photos.filter(p => p.cat === activeCat)
     return activeSubcat ? byCat.filter(p => p.subcat === activeSubcat) : byCat
   }, [photos, activeCat, activeSubcat])
