@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react'
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion'
 import BookingCalendar from './BookingCalendar'
 import Admin from './Admin'
@@ -72,6 +72,39 @@ function downloadICS(form) {
   document.body.appendChild(a); a.click()
   document.body.removeChild(a); URL.revokeObjectURL(url)
 }
+
+/* ─── Cart context ───────────────────────────────────────── */
+const CartCtx = createContext(null)
+
+function CartProvider({ children }) {
+  const [items, setItems] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('vbd_cart') || '[]') } catch { return [] }
+  })
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    try { sessionStorage.setItem('vbd_cart', JSON.stringify(items)) } catch {}
+  }, [items])
+
+  const add = (incoming) => setItems(prev => {
+    const existing = prev.find(i => i.key === incoming.key)
+    if (existing) return prev.map(i => i.key === incoming.key ? { ...i, qty: i.qty + 1 } : i)
+    return [...prev, { ...incoming, qty: 1 }]
+  })
+  const remove = (key) => setItems(prev => prev.filter(i => i.key !== key))
+  const setQty = (key, qty) => qty < 1 ? remove(key) : setItems(prev => prev.map(i => i.key === key ? { ...i, qty } : i))
+  const clear = () => setItems([])
+
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0)
+  const count = items.reduce((s, i) => s + i.qty, 0)
+
+  return (
+    <CartCtx.Provider value={{ items, add, remove, setQty, clear, open, setOpen, total, count }}>
+      {children}
+    </CartCtx.Provider>
+  )
+}
+const useCart = () => useContext(CartCtx)
 
 /* ─── Photo catalogue ─────────────────────────────────────── */
 /* Categories: brand · corpo · event · mode                    */
@@ -226,6 +259,7 @@ function Logo({ size = 32 }) {
 function Navbar({ onNav }) {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
+  const { count, setOpen: openCart } = useCart()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60)
@@ -237,6 +271,7 @@ function Navbar({ onNav }) {
     { id: 'about',        label: 'À Propos' },
     { id: 'portfolio',    label: 'Portfolio' },
     { id: 'sessions',     label: 'Sessions' },
+    { id: 'boutique',     label: 'Boutique' },
     { id: 'temoignages',  label: 'Avis' },
     { id: 'booking',      label: 'Réserver' },
     { id: 'contact',      label: 'Contact' },
@@ -301,6 +336,22 @@ function Navbar({ onNav }) {
             </li>
           ))}
         </ul>
+
+        {/* Cart icon */}
+        <button
+          onClick={() => openCart(true)}
+          style={{ background: 'none', border: '1px solid rgba(196,150,90,0.25)', cursor: 'pointer', color: '#C4965A', padding: '0.35rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.4rem', position: 'relative', transition: 'border-color 0.2s' }}
+          aria-label="Panier"
+          onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(196,150,90,0.6)'}
+          onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(196,150,90,0.25)'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+          {count > 0 && (
+            <span style={{ background: '#C4965A', color: '#080808', fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 700, borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{count}</span>
+          )}
+        </button>
 
         {/* Hamburger */}
         <button
@@ -999,6 +1050,30 @@ function Portfolio({ photos: photosProp }) {
   )
 }
 
+/* ─── Boutique — tirage d'art ────────────────────────────── */
+const PRINT_SIZES = [
+  { label: '20 × 30 cm', price: 45 },
+  { label: '30 × 45 cm', price: 85 },
+  { label: '40 × 60 cm', price: 135 },
+  { label: '50 × 75 cm', price: 195 },
+]
+const FRAME_OPTIONS = [
+  { label: 'Sans cadre',   surcharge: 0  },
+  { label: 'Cadre noir',   surcharge: 35 },
+  { label: 'Cadre blanc',  surcharge: 35 },
+  { label: 'Cadre bois',   surcharge: 45 },
+]
+const PRINTS = [
+  { id: 'pr1', file: 'p1410484.jpg', title: 'Miya Kones I',   slogan: "L'identité d'une marque commence par une image." },
+  { id: 'pr2', file: 'p1440541.jpg', title: 'Miya Kones VII', slogan: "La marque, c'est ce qu'on ressent avant ce qu'on voit." },
+  { id: 'pr3', file: 'p1380823.jpg', title: 'Toukan V',       slogan: "Présence, caractère, authenticité." },
+  { id: 'pr4', file: 'p1380840.jpg', title: 'Toukan VII',     slogan: "Chaque angle révèle une nouvelle vérité." },
+  { id: 'pr5', file: 'p1440908.jpg', title: 'Mode XII',       slogan: "La mode naît de l'audace." },
+  { id: 'pr6', file: 'p1440987.jpg', title: 'Mode XIV',       slogan: "La mode n'est belle qu'en mouvement." },
+  { id: 'pr7', file: 'dsc1744.jpg',  title: 'Événement VII',  slogan: "Ce qui se vit ensemble se souvient ensemble." },
+  { id: 'pr8', file: 'p1410142.jpg', title: 'Sayaspora I',    slogan: "La diaspora célèbre, l'image garde mémoire." },
+]
+
 /* ─── Sessions ───────────────────────────────────────────── */
 const SESSIONS = [
   {
@@ -1263,7 +1338,7 @@ function Booking({ selectedSession, onSessionConsumed }) {
         pointerEvents: 'none',
       }} />
 
-      <SectionHeader number="04" title="Réservation" subtitle="Votre Séance" />
+      <SectionHeader number="05" title="Réservation" subtitle="Votre Séance" />
 
       <div style={{ maxWidth: '720px', margin: '0 auto' }}>
         <AnimatePresence mode="wait">
@@ -2211,6 +2286,327 @@ function Reviews() {
   )
 }
 
+/* ─── PrintCard ──────────────────────────────────────────── */
+function PrintCard({ print }) {
+  const { add } = useCart()
+  const [size, setSize] = useState(0)
+  const [frame, setFrame] = useState(0)
+  const [added, setAdded] = useState(false)
+
+  const price = PRINT_SIZES[size].price + FRAME_OPTIONS[frame].surcharge
+
+  const handleAdd = () => {
+    add({
+      key: `${print.id}-${size}-${frame}`,
+      file: print.file,
+      title: print.title,
+      size: PRINT_SIZES[size].label,
+      frame: FRAME_OPTIONS[frame].label,
+      price,
+    })
+    setAdded(true)
+    setTimeout(() => setAdded(false), 1800)
+  }
+
+  const pillBase = { fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, padding: '0.25rem 0.6rem', cursor: 'pointer', transition: 'all 0.2s', border: '1px solid' }
+
+  return (
+    <div style={{ background: '#0E0E0E', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ overflow: 'hidden', aspectRatio: '4/5', position: 'relative' }}>
+        <img
+          src={`${BASE}photos/thumbs/${print.file}`}
+          alt={print.title}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', display: 'block' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)' }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+        />
+      </div>
+      <div style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <h4 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', fontWeight: 500, color: '#F5F0E8', margin: '0 0 0.2rem' }}>{print.title}</h4>
+        <p style={{ fontFamily: "'Inter'", fontSize: '0.65rem', fontWeight: 300, color: '#5A5450', letterSpacing: '0.06em', margin: '0 0 1rem', fontStyle: 'italic', lineHeight: 1.5 }}>{print.slogan}</p>
+
+        <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 400, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6A6460', margin: '0 0 0.4rem' }}>Format</p>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+          {PRINT_SIZES.map((s, i) => (
+            <button key={i} onClick={() => setSize(i)} style={{
+              ...pillBase,
+              background: size === i ? '#C4965A' : 'transparent',
+              borderColor: size === i ? '#C4965A' : 'rgba(196,150,90,0.25)',
+              color: size === i ? '#080808' : '#C4965A',
+              fontWeight: size === i ? 500 : 300,
+            }}>{s.label}</button>
+          ))}
+        </div>
+
+        <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 400, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6A6460', margin: '0 0 0.4rem' }}>Encadrement</p>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {FRAME_OPTIONS.map((f, i) => (
+            <button key={i} onClick={() => setFrame(i)} style={{
+              ...pillBase,
+              background: frame === i ? 'rgba(196,150,90,0.12)' : 'transparent',
+              borderColor: frame === i ? '#C4965A' : 'rgba(196,150,90,0.15)',
+              color: frame === i ? '#C4965A' : '#5A5450',
+            }}>{f.label}{f.surcharge > 0 ? ` +${f.surcharge}$` : ''}</button>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(196,150,90,0.1)', paddingTop: '1rem' }}>
+          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem', fontWeight: 600, color: '#C4965A' }}>{price} $<span style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, color: '#5A5450', marginLeft: '0.3rem' }}>CAD</span></span>
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={handleAdd}
+            style={{
+              background: added ? 'rgba(196,150,90,0.15)' : 'transparent',
+              border: `1px solid ${added ? '#C4965A' : 'rgba(196,150,90,0.35)'}`,
+              color: '#C4965A',
+              fontFamily: "'Inter'", fontSize: '0.62rem', fontWeight: 400,
+              letterSpacing: '0.15em', textTransform: 'uppercase',
+              padding: '0.5rem 1rem', cursor: 'pointer', transition: 'all 0.3s',
+            }}
+          >
+            {added ? '✓ Ajouté' : '+ Panier'}
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Shop ────────────────────────────────────────────────── */
+function Shop() {
+  return (
+    <section id="boutique" style={{ background: '#080808', padding: 'clamp(5rem, 10vw, 9rem) clamp(1.5rem, 5vw, 4rem)' }}>
+      <SectionHeader number="04" title="Boutique" subtitle="Tirages d'Art" />
+      <Reveal>
+        <p style={{ textAlign: 'center', fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.85rem', color: '#7A7268', maxWidth: '540px', margin: '0 auto 3.5rem', lineHeight: 1.8, letterSpacing: '0.04em' }}>
+          Chaque tirage est imprimé sur papier photo mat premium et expédié sous 7 à 10 jours ouvrables partout au Canada. Paiement par virement ou PayPal.
+        </p>
+      </Reveal>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '1.5px', maxWidth: '1200px', margin: '0 auto' }}>
+        {PRINTS.map((p, i) => (
+          <Reveal key={p.id} delay={i * 0.07}>
+            <PrintCard print={p} />
+          </Reveal>
+        ))}
+      </div>
+      <Reveal delay={0.3}>
+        <p style={{ textAlign: 'center', marginTop: '2.5rem', fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem', color: '#3A3530', letterSpacing: '0.08em' }}>
+          Livraison Canada · Impression sur papier Hahnemühle
+        </p>
+      </Reveal>
+    </section>
+  )
+}
+
+/* ─── CartDrawer ─────────────────────────────────────────── */
+function CartDrawer() {
+  const { items, remove, setQty, clear, open, setOpen, total, count } = useCart()
+  const [view, setView] = useState('cart')
+  const [form, setForm] = useState({ nom: '', email: '', telephone: '', rue: '', ville: '', province: 'Québec', postal: '' })
+  const [sending, setSending] = useState(false)
+  const [errs, setErrs] = useState({})
+
+  useEffect(() => {
+    if (!open) { const t = setTimeout(() => { setView('cart'); setSending(false); setErrs({}) }, 350); return () => clearTimeout(t) }
+  }, [open])
+
+  const validate = () => {
+    const e = {}
+    if (!form.nom.trim()) e.nom = 1
+    if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = 1
+    if (!form.rue.trim()) e.rue = 1
+    if (!form.ville.trim()) e.ville = 1
+    if (!form.postal.trim()) e.postal = 1
+    return e
+  }
+
+  const handleOrder = async (e) => {
+    e.preventDefault()
+    const v = validate()
+    if (Object.keys(v).length) { setErrs(v); return }
+    setSending(true)
+    try {
+      const settings = JSON.parse(localStorage.getItem('vbd_admin_settings') || '{}')
+      if (settings.formspreeId) {
+        const lines = items.map(i => `${i.title} (${i.size} · ${i.frame}) × ${i.qty} — ${i.price * i.qty}$ CAD`).join('\n')
+        await fetch(`https://formspree.io/f/${settings.formspreeId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            _subject: `🛒 Nouvelle commande viewbydaryl — ${form.nom}`,
+            _replyto: form.email,
+            nom: form.nom, email: form.email, telephone: form.telephone || 'n/a',
+            adresse: `${form.rue}, ${form.ville}, ${form.province} ${form.postal}`,
+            commande: lines,
+            total: `${total}$ CAD`,
+          }),
+        })
+      }
+    } catch {}
+    setSending(false)
+    setView('success')
+    clear()
+  }
+
+  const setF = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrs(er => ({ ...er, [k]: 0 })) }
+  const drInput = (hasErr) => ({
+    width: '100%', boxSizing: 'border-box',
+    background: '#0E0E0E', border: `1px solid ${hasErr ? 'rgba(180,55,55,0.5)' : 'rgba(196,150,90,0.18)'}`,
+    color: '#E8E0D0', fontFamily: "'Inter'", fontSize: '0.82rem', fontWeight: 300,
+    padding: '0.65rem 0.9rem', outline: 'none',
+  })
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 200, backdropFilter: 'blur(4px)' }}
+          />
+          <motion.div
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+            style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px, 100vw)',
+              background: '#0A0A0A', borderLeft: '1px solid rgba(196,150,90,0.12)',
+              zIndex: 201, display: 'flex', flexDirection: 'column',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.2rem 1.5rem', borderBottom: '1px solid rgba(196,150,90,0.1)', flexShrink: 0 }}>
+              {view === 'checkout' ? (
+                <button onClick={() => setView('cart')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C4965A', fontFamily: "'Inter'", fontSize: '0.65rem', letterSpacing: '0.12em', padding: 0 }}>
+                  ← Retour au panier
+                </button>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.15rem', fontWeight: 500, color: '#F5F0E8' }}>
+                    {view === 'success' ? 'Commande confirmée' : 'Panier'}
+                  </span>
+                  {count > 0 && view === 'cart' && (
+                    <span style={{ background: '#C4965A', color: '#080808', fontFamily: "'Inter'", fontSize: '0.58rem', fontWeight: 600, borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{count}</span>
+                  )}
+                </div>
+              )}
+              <button onClick={() => setOpen(false)} style={{ background: 'none', border: '1px solid rgba(196,150,90,0.2)', color: '#C4965A', cursor: 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>✕</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+              {view === 'success' && (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                  <div style={{ fontSize: '2rem', color: '#C4965A', marginBottom: '1rem' }}>✓</div>
+                  <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.5rem', color: '#F5F0E8', fontWeight: 500, margin: '0 0 1rem' }}>Commande reçue !</h3>
+                  <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.8rem', color: '#7A7268', lineHeight: 1.8, margin: '0 0 2rem' }}>
+                    Merci pour votre commande. Nous vous contacterons dans les 24h pour confirmer les détails de livraison et les instructions de paiement.
+                  </p>
+                  <button onClick={() => setOpen(false)} style={{ background: 'none', border: '1px solid rgba(196,150,90,0.35)', color: '#C4965A', fontFamily: "'Inter'", fontSize: '0.68rem', letterSpacing: '0.18em', padding: '0.7rem 2rem', cursor: 'pointer', textTransform: 'uppercase' }}>
+                    Fermer
+                  </button>
+                </div>
+              )}
+
+              {view === 'checkout' && (
+                <form onSubmit={handleOrder}>
+                  <h4 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.05rem', fontWeight: 500, color: '#F5F0E8', margin: '0 0 1.2rem' }}>Informations de livraison</h4>
+                  {[
+                    { k: 'nom',       label: 'Nom complet *',  ph: 'DORILAS Daryl',            type: 'text'  },
+                    { k: 'email',     label: 'Email *',         ph: 'daryl@example.com',        type: 'email' },
+                    { k: 'telephone', label: 'Téléphone',       ph: '+1 514 000 0000',           type: 'tel'   },
+                    { k: 'rue',       label: 'Adresse *',       ph: '123 Rue Sainte-Catherine', type: 'text'  },
+                    { k: 'ville',     label: 'Ville *',         ph: 'Montréal',                 type: 'text'  },
+                    { k: 'province',  label: 'Province',        ph: 'Québec',                   type: 'text'  },
+                    { k: 'postal',    label: 'Code postal *',   ph: 'H2X 1Y6',                  type: 'text'  },
+                  ].map(({ k, label, ph, type }) => (
+                    <div key={k} style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ display: 'block', fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 400, letterSpacing: '0.18em', textTransform: 'uppercase', color: errs[k] ? '#B43737' : '#5A5450', marginBottom: '0.3rem' }}>{label}</label>
+                      <input type={type} placeholder={ph} value={form[k]} onChange={e => setF(k, e.target.value)} style={drInput(errs[k])} />
+                    </div>
+                  ))}
+
+                  <div style={{ borderTop: '1px solid rgba(196,150,90,0.1)', paddingTop: '1rem', marginTop: '1.2rem' }}>
+                    <p style={{ fontFamily: "'Inter'", fontSize: '0.55rem', fontWeight: 400, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#5A5450', margin: '0 0 0.7rem' }}>Récapitulatif</p>
+                    {items.map(item => (
+                      <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+                        <span style={{ fontFamily: "'Inter'", fontSize: '0.72rem', fontWeight: 300, color: '#8A8278' }}>{item.title} × {item.qty}</span>
+                        <span style={{ fontFamily: "'Inter'", fontSize: '0.72rem', fontWeight: 300, color: '#C4965A', flexShrink: 0, marginLeft: '0.5rem' }}>{item.price * item.qty}$</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(196,150,90,0.1)' }}>
+                      <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 500, color: '#F5F0E8' }}>Total</span>
+                      <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 600, color: '#C4965A' }}>{total}$ CAD</span>
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={sending} style={{ width: '100%', marginTop: '1.5rem', background: '#C4965A', border: 'none', color: '#080808', fontFamily: "'Inter'", fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '0.9rem', cursor: sending ? 'wait' : 'pointer', opacity: sending ? 0.7 : 1, transition: 'opacity 0.3s' }}>
+                    {sending ? 'Envoi en cours…' : 'Confirmer la commande'}
+                  </button>
+                  <p style={{ textAlign: 'center', fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, color: '#3A3530', marginTop: '0.8rem', lineHeight: 1.6, letterSpacing: '0.04em' }}>
+                    Paiement par virement Interac ou PayPal — instructions envoyées par email.
+                  </p>
+                </form>
+              )}
+
+              {view === 'cart' && items.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.2rem', fontWeight: 400, color: '#3A3530', marginBottom: '0.5rem' }}>Votre panier est vide</p>
+                  <p style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.72rem', color: '#2A2A2A', letterSpacing: '0.05em' }}>Ajoutez des tirages depuis la boutique</p>
+                </div>
+              )}
+
+              {view === 'cart' && items.length > 0 && (
+                <AnimatePresence>
+                  {items.map(item => (
+                    <motion.div key={item.key} layout exit={{ opacity: 0, x: 30 }} transition={{ duration: 0.22 }}
+                      style={{ display: 'flex', gap: '0.9rem', marginBottom: '1.2rem', paddingBottom: '1.2rem', borderBottom: '1px solid rgba(196,150,90,0.07)' }}
+                    >
+                      <img src={`${BASE}photos/thumbs/${item.file}`} alt={item.title} style={{ width: '64px', height: '80px', objectFit: 'cover', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 500, color: '#F5F0E8', margin: '0 0 0.15rem' }}>{item.title}</p>
+                        <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, color: '#5A5450', margin: '0 0 0.6rem', letterSpacing: '0.06em' }}>{item.size} · {item.frame}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            {[['−', item.qty - 1], ['+', item.qty + 1]].map(([lbl, qty], i) => (
+                              <button key={i} onClick={() => setQty(item.key, qty)} style={{ background: 'none', border: '1px solid rgba(196,150,90,0.2)', color: '#C4965A', width: '22px', height: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', flexShrink: 0 }}>
+                                {lbl}
+                              </button>
+                            ))}
+                            <span style={{ fontFamily: "'Inter'", fontSize: '0.75rem', fontWeight: 300, color: '#E8E0D0', minWidth: '20px', textAlign: 'center' }}>{item.qty}</span>
+                          </div>
+                          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 600, color: '#C4965A' }}>{item.price * item.qty}$</span>
+                        </div>
+                        <button onClick={() => remove(item.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3A3530', fontFamily: "'Inter'", fontSize: '0.58rem', letterSpacing: '0.08em', marginTop: '0.4rem', padding: 0, textDecoration: 'underline' }}>Retirer</button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              )}
+            </div>
+
+            {/* Footer */}
+            {view === 'cart' && items.length > 0 && (
+              <div style={{ padding: '1.2rem 1.5rem', borderTop: '1px solid rgba(196,150,90,0.1)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
+                  <span style={{ fontFamily: "'Inter'", fontWeight: 300, fontSize: '0.7rem', color: '#5A5450', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Sous-total</span>
+                  <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.3rem', fontWeight: 600, color: '#C4965A' }}>{total}$ CAD</span>
+                </div>
+                <button
+                  onClick={() => setView('checkout')}
+                  style={{ width: '100%', background: '#C4965A', border: 'none', color: '#080808', fontFamily: "'Inter'", fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '0.9rem', cursor: 'pointer' }}
+                >
+                  Commander
+                </button>
+              </div>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /* ─── App ────────────────────────────────────────────────── */
 export default function App() {
   const [adminOpen, setAdminOpen] = useState(false)
@@ -2243,12 +2639,13 @@ export default function App() {
   }
 
   return (
-    <>
+    <CartProvider>
       <Navbar onNav={scrollTo} />
       <Hero onCta={scrollTo} />
       <About about={content.about} />
       <Portfolio photos={content.photos} />
       <Sessions onBook={handleBookSession} sessions={content.sessions} />
+      <Shop />
       <Booking
         selectedSession={pendingSession}
         onSessionConsumed={() => setPendingSession(null)}
@@ -2257,6 +2654,7 @@ export default function App() {
       <Contact />
       <Footer onAdminTrigger={() => setAdminOpen(true)} />
       <FloatingContact />
+      <CartDrawer />
 
       {/* Admin dashboard overlay */}
       <AnimatePresence>
@@ -2275,6 +2673,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-    </>
+    </CartProvider>
   )
 }
