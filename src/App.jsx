@@ -4,6 +4,7 @@ import BookingCalendar from './BookingCalendar'
 import Admin from './Admin'
 
 const BASE = import.meta.env.BASE_URL
+const PHOTO_BASE = import.meta.env.VITE_PHOTO_CDN || BASE
 const FORMSPREE = 'https://formspree.io/f/mwvazzpq'
 
 /* ─── Bookings (availability) helpers ───────────────────── */
@@ -426,7 +427,7 @@ function Hero({ onCta }) {
       {/* Parallax background */}
       <motion.div style={{ position: 'absolute', inset: '-15%', y }}>
         <img
-          src={`${BASE}photos/p1270769-avec-accentuation-bruit.webp`}
+          src={`${PHOTO_BASE}photos/p1270769-avec-accentuation-bruit.webp`}
           alt="viewbydaryl hero"
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
@@ -633,7 +634,7 @@ function About({ about }) {
             }} />
             <div style={{ position: 'relative', zIndex: 1, overflow: 'hidden', aspectRatio: '4/5' }}>
               <img
-                src={`${BASE}photos/p1090055.webp`}
+                src={`${PHOTO_BASE}photos/p1090055.webp`}
                 alt="Daryl — Photographe"
                 style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.8s ease', display: 'block' }}
                 onMouseEnter={e => e.target.style.transform = 'scale(1.04)'}
@@ -833,7 +834,7 @@ function Portfolio({ photos: photosProp }) {
                     style={{ position: 'relative', flexShrink: 0 }}
                   >
                     <img
-                      src={`${BASE}photos/thumbs/${p.file}`}
+                      src={`${PHOTO_BASE}photos/thumbs/${p.file}`}
                       alt={p.title}
                       style={{
                         width: '88px',
@@ -941,7 +942,7 @@ function Portfolio({ photos: photosProp }) {
               </div>
 
               <img
-                src={`${BASE}photos/thumbs/${photo.file}`}
+                src={`${PHOTO_BASE}photos/thumbs/${photo.file}`}
                 alt={photo.title}
                 loading="lazy"
                 decoding="async"
@@ -1050,7 +1051,7 @@ function Portfolio({ photos: photosProp }) {
                 }}
               >
                 <img
-                  src={`${BASE}photos/${lightbox.file}`}
+                  src={`${PHOTO_BASE}photos/${lightbox.file}`}
                   alt={lightbox.title}
                   style={{
                     maxWidth: '100%', maxHeight: '75vh',
@@ -2373,7 +2374,7 @@ function PrintCard({ print }) {
     <div style={{ background: '#0E0E0E', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ overflow: 'hidden', aspectRatio: '4/5', position: 'relative' }}>
         <img
-          src={`${BASE}photos/thumbs/${print.file}`}
+          src={`${PHOTO_BASE}photos/thumbs/${print.file}`}
           alt={print.title}
           style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', display: 'block' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)' }}
@@ -2618,7 +2619,7 @@ function CartDrawer() {
                     <motion.div key={item.key} layout exit={{ opacity: 0, x: 30 }} transition={{ duration: 0.22 }}
                       style={{ display: 'flex', gap: '0.9rem', marginBottom: '1.2rem', paddingBottom: '1.2rem', borderBottom: '1px solid rgba(196,150,90,0.07)' }}
                     >
-                      <img src={`${BASE}photos/thumbs/${item.file}`} alt={item.title} style={{ width: '64px', height: '80px', objectFit: 'cover', flexShrink: 0 }} />
+                      <img src={`${PHOTO_BASE}photos/thumbs/${item.file}`} alt={item.title} style={{ width: '64px', height: '80px', objectFit: 'cover', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 500, color: '#F5F0E8', margin: '0 0 0.15rem' }}>{item.title}</p>
                         <p style={{ fontFamily: "'Inter'", fontSize: '0.6rem', fontWeight: 300, color: '#5A5450', margin: '0 0 0.6rem', letterSpacing: '0.06em' }}>{item.size} · {item.frame}</p>
